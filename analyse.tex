@@ -391,3 +391,147 @@ projet. Son intérêt devra être vérifié expérimentalement en
 comparant trois configurations : apprentissage automatique seul,
 méthode classique seule et agent hybride.
 
+
+\section{Identification des acteurs}
+
+Cette section présente les différentes entités externes qui
+interagissent avec le système ou participent à son utilisation.
+L'identification des acteurs permet de mieux définir les limites
+du système ainsi que les responsabilités de chaque intervenant.
+
+\subsection{Description des acteurs}
+
+Dans le cadre de ce projet, les principaux acteurs identifiés sont :
+
+\begin{itemize}
+    \item \textbf{Administrateur réseau :}
+    Il supervise le fonctionnement de l'agent hybride, consulte
+    les résultats de classification et contrôle l'application
+    des politiques de qualité de service.
+
+    \item \textbf{Sources de trafic :}
+    Elles représentent les applications et les équipements
+    générant les flux réseau à analyser, tels que la navigation
+    Web, le streaming vidéo et les communications VoIP.
+
+    \item \textbf{Équipements réseau :}
+    Ils constituent l'environnement dans lequel les flux sont
+    transportés et sur lequel les politiques QoS sont appliquées,
+    notamment à travers le marquage DSCP et la gestion des files HTB.
+
+    \item \textbf{Environnement d'évaluation :}
+    Il permet de générer différents scénarios de trafic et de
+    mesurer les performances du système, notamment la précision
+    de classification, le temps d'inférence, la latence et la gigue.
+\end{itemize}
+
+\subsection{Synthèse des acteurs}
+
+\begin{table}[H]
+\centering
+\caption{Acteurs du système et leurs responsabilités}
+\label{tab:acteurs}
+\small
+\begin{tabularx}{\textwidth}{|p{3.2cm}|Y|}
+\hline
+\textbf{Acteur} & \textbf{Responsabilité} \\
+\hline
+Administrateur réseau &
+Superviser le système, consulter les classifications et
+contrôler les politiques QoS. \\
+\hline
+Sources de trafic &
+Générer les flux réseau destinés à être analysés par l'agent. \\
+\hline
+Équipements réseau &
+Transporter les flux et appliquer les politiques de qualité
+de service. \\
+\hline
+Environnement d'évaluation &
+Générer les scénarios expérimentaux et mesurer les performances
+du système. \\
+\hline
+\end{tabularx}
+\end{table}
+
+
+
+\section{Besoins fonctionnels}
+
+Les besoins fonctionnels représentent les différentes
+fonctionnalités que doit assurer l'agent hybride afin de répondre
+aux objectifs définis précédemment.
+
+Dans le cadre de ce projet, les fonctionnalités attendues
+concernent la capture du trafic, l'extraction des caractéristiques,
+la classification, l'arbitrage des résultats, le rejet des flux
+inconnus et l'application des politiques de qualité de service.
+
+\subsection{Liste des besoins fonctionnels}
+
+Les besoins fonctionnels identifiés sont présentés dans
+le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Liste des besoins fonctionnels}
+\label{tab:besoins-fonctionnels}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Fonctionnalité} & \textbf{Description} \\
+\hline
+
+BF01 & Capture du trafic &
+Collecter les paquets réseau à analyser sans accéder au contenu
+déchiffré des communications. \\
+\hline
+
+BF02 & Extraction des caractéristiques &
+Extraire les caractéristiques statistiques et temporelles
+des flux, notamment la taille des paquets, leur direction,
+les intervalles temporels et la durée. \\
+\hline
+
+BF03 & Classification précoce &
+Permettre l'identification d'un flux à partir de ses N premiers
+paquets, sans attendre la fin de la communication. \\
+\hline
+
+BF04 & Classification par apprentissage &
+Utiliser un modèle d'apprentissage automatique pour prédire
+la catégorie d'un flux à partir des caractéristiques extraites. \\
+\hline
+
+BF05 & Analyse symbolique &
+Appliquer des règles prédéfinies exploitant les métadonnées
+disponibles, telles que les ports, le SNI et les informations DNS. \\
+\hline
+
+BF06 & Arbitrage hybride &
+Combiner les résultats du modèle d'apprentissage et du moteur
+de règles afin de produire une décision finale. \\
+\hline
+
+BF07 & Rejet des flux inconnus &
+Identifier et rejeter les classifications insuffisamment fiables
+afin d'éviter l'affectation injustifiée d'une classe connue. \\
+\hline
+
+BF08 & Gestion de la QoS &
+Associer une politique de qualité de service à la décision finale,
+notamment à travers le marquage DSCP et la gestion des files HTB. \\
+\hline
+
+BF09 & Explicabilité &
+Fournir des explications sur les décisions du modèle en identifiant
+les caractéristiques ayant contribué aux prédictions. \\
+\hline
+
+BF10 & Évaluation des performances &
+Mesurer les performances de classification, la détection des flux
+inconnus, le temps d'inférence et l'impact des politiques QoS. \\
+\hline
+
+\end{tabularx}
+\end{table}
