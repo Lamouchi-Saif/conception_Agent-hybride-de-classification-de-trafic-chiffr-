@@ -1706,6 +1706,1984 @@ Une évaluation temporelle et une analyse des flux
 inconnus sont donc nécessaires pour éviter de
 surestimer la capacité de généralisation du système.
 
+
+
+
+
+% ============================================================
+% COMPLEMENTS A LA CONCEPTION TECHNIQUE
+% A INSERER AVANT LA SECTION CONCLUSION
+% ============================================================
+
+% ------------------------------------------------------------
+\section{Orchestration et responsabilités détaillées des modules}
+% ------------------------------------------------------------
+
+\subsection{Responsabilités des composants}
+
+Afin de garantir une séparation claire des responsabilités,
+chaque composant possède une fonction principale et une
+interface d'échange définie.
+
+\begin{table}[H]
+\centering
+\caption{Responsabilités détaillées des composants}
+\label{tab:responsabilites_modules}
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Composant} & \textbf{Responsabilité} & \textbf{Sortie principale} \\
+\hline
+Capture & Observer les paquets réseau. & Observations horodatées. \\
+\hline
+Gestionnaire de flux & Regrouper les paquets et gérer les délais. & État du flux. \\
+\hline
+Extracteur & Calculer les caractéristiques statistiques. & Vecteur de caractéristiques. \\
+\hline
+Préprocesseur & Vérifier et normaliser les caractéristiques. & Vecteur préparé. \\
+\hline
+Orchestrateur & Déclencher les moteurs ML et symbolique. & Résultats associés au flux. \\
+\hline
+Classifieur ML & Produire les scores des classes. & Résultat ML. \\
+\hline
+Moteur symbolique & Évaluer les règles applicables. & Résultat symbolique. \\
+\hline
+Arbitre & Fusionner les résultats et décider. & Décision finale. \\
+\hline
+Gestionnaire QoS & Appliquer une politique autorisée. & Résultat QoS. \\
+\hline
+Journalisation & Conserver les événements utiles. & Traces horodatées. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Rôle de l'orchestrateur}
+
+Le module de capture ne doit pas être responsable de
+l'exécution directe des algorithmes de classification.
+Il transmet les observations au gestionnaire de flux.
+Après extraction et prétraitement, l'orchestrateur
+transmet le même vecteur de caractéristiques au
+classifieur ML et au moteur symbolique.
+
+Lorsque l'implémentation le permet, ces deux traitements
+peuvent être exécutés en parallèle. L'orchestrateur
+associe chaque réponse à un identifiant de flux et à
+un identifiant de fenêtre d'observation.
+
+Il vérifie les délais de réponse et transmet à l'arbitre
+les résultats disponibles ainsi que leur état :
+disponible, absent, invalide ou expiré.
+
+\subsection{Cycle de traitement}
+
+\begin{enumerate}
+    \item Capture des paquets.
+    \item Identification et mise à jour du flux.
+    \item Extraction des caractéristiques.
+    \item Vérification et prétraitement.
+    \item Exécution des moteurs ML et symbolique.
+    \item Fusion des résultats par l'arbitre.
+    \item Application éventuelle de la politique QoS.
+    \item Journalisation de la décision et de ses justifications.
+\end{enumerate}
+
+% ------------------------------------------------------------
+\section{Politique d'arbitrage et cas de fonctionnement}
+% ------------------------------------------------------------
+
+\subsection{Distinction entre absence d'information et contradiction}
+
+Une règle non activée ne constitue pas une preuve contre
+une classe. Le moteur symbolique doit distinguer quatre états :
+
+\begin{itemize}
+    \item \texttt{SUPPORT} : des règles soutiennent une classe ;
+    \item \texttt{CONTRADICTION} : une règle fiable soutient
+    explicitement une classe incompatible ;
+    \item \texttt{NO\_EVIDENCE} : aucune règle pertinente
+    n'est disponible ;
+    \item \texttt{ERROR} : le moteur rencontre une défaillance.
+\end{itemize}
+
+Cette distinction évite de confondre une absence de métadonnées
+DNS ou SNI avec une contradiction.
+
+\subsection{Table de décision de l'arbitre}
+
+\begin{table}[H]
+\centering
+\caption{Comportement attendu selon les résultats}
+\label{tab:decision_arbitre}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{Résultat ML} & \textbf{Résultat symbolique} &
+\textbf{Décision attendue} \\
+\hline
+Confiant & Soutien de la même classe &
+Accepter si les seuils sont atteints. \\
+\hline
+Confiant & Aucune preuve &
+Utiliser le mode ML seul uniquement s'il est autorisé et validé. \\
+\hline
+Incertain & Soutien symbolique fiable &
+Utiliser une règle de secours validée, sinon rejeter. \\
+\hline
+Disponible & Contradiction explicite &
+Retourner \texttt{UNKNOWN}. \\
+\hline
+Indisponible & Résultat symbolique disponible &
+Utiliser le mode symbolique seul uniquement s'il est validé. \\
+\hline
+Indisponible & Aucune preuve ou erreur &
+Retourner \texttt{UNKNOWN}. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Normalisation des scores}
+
+La fusion pondérée est valide uniquement si les scores
+ML et symboliques sont comparables.
+
+Le score ML doit être calibré sur un ensemble de validation
+indépendant. Le score symbolique doit être normalisé
+dans l'intervalle $[0,1]$ selon une méthode documentée.
+
+Lorsque les deux sources sont disponibles :
+
+\[
+S_H(c|X)=
+\alpha P_{ML}(c|X)+\beta S_R(c|X)
+\]
+
+avec :
+
+\[
+\alpha+\beta=1
+\]
+
+En revanche, lorsqu'aucune règle n'est activée, il ne faut
+pas automatiquement interpréter le score symbolique nul
+comme une contradiction. Le système doit passer dans
+un mode dégradé explicitement défini.
+
+\subsection{Critères d'acceptation}
+
+Une classe candidate peut être acceptée lorsque :
+
+\begin{itemize}
+    \item les caractéristiques sont valides ;
+    \item la fenêtre d'observation est suffisante ;
+    \item le score hybride maximal dépasse le seuil $\tau$ ;
+    \item la marge entre les deux meilleures classes dépasse
+    le seuil $\mu$ ;
+    \item aucune contradiction symbolique fiable n'est détectée.
+\end{itemize}
+
+La marge est définie par :
+
+\[
+M(X)=S_H(c_1|X)-S_H(c_2|X)
+\]
+
+où $c_1$ et $c_2$ sont les deux classes présentant
+les scores hybrides les plus élevés.
+
+Les seuils $\tau$ et $\mu$, ainsi que les poids
+$\alpha$ et $\beta$, sont déterminés sur les données
+de validation puis figés avant le test.
+
+% ------------------------------------------------------------
+\section{Spécification détaillée des contrats d'interface}
+% ------------------------------------------------------------
+
+\subsection{Conventions générales}
+
+Les interfaces utilisent des noms de champs stables
+et des types explicites. Les tailles sont exprimées
+en octets, les durées en secondes et les ratios dans
+l'intervalle $[0,1]$.
+
+Les valeurs absentes sont représentées explicitement
+par \texttt{null}. Elles ne doivent jamais être remplacées
+silencieusement par zéro.
+
+Chaque message comporte un identifiant de flux et,
+lorsque plusieurs fenêtres sont utilisées, un identifiant
+de fenêtre.
+
+\subsection{Contrat du vecteur de caractéristiques}
+
+\begin{verbatim}
+{
+  "schema_version": "1.0",
+  "flow_id": "flow_001",
+  "window_id": 1,
+  "protocol": "TCP",
+  "packet_count": 10,
+  "mean_packet_size_bytes": 180.5,
+  "std_packet_size_bytes": 35.2,
+  "mean_interarrival_seconds": 0.02,
+  "duration_seconds": 1.8,
+  "direction_ratio": 0.60,
+  "sni": null,
+  "dns_name": null,
+  "missing_features": ["sni", "dns_name"]
+}
+\end{verbatim}
+
+\subsection{Contrat de sortie du moteur symbolique}
+
+\begin{verbatim}
+{
+  "schema_version": "1.0",
+  "flow_id": "flow_001",
+  "window_id": 1,
+  "engine_status": "ok",
+  "evidence_status": "SUPPORT",
+  "activated_rules": ["R1", "R2"],
+  "contradicting_rules": [],
+  "suggested_class": "VoIP",
+  "rule_scores": {
+    "VoIP": 0.85,
+    "Video": 0.10,
+    "Web": 0.05
+  }
+}
+\end{verbatim}
+
+Lorsque aucune règle pertinente n'est activée,
+\texttt{evidence\_status} prend la valeur
+\texttt{NO\_EVIDENCE} et \texttt{suggested\_class}
+vaut \texttt{null}.
+
+\subsection{Contrat de sortie de l'arbitre}
+
+\begin{verbatim}
+{
+  "schema_version": "1.0",
+  "flow_id": "flow_001",
+  "window_id": 1,
+  "status": "known",
+  "final_class": "VoIP",
+  "hybrid_score": 0.89,
+  "confidence_margin": 0.31,
+  "decision_reason": "ML_RULES_AGREE",
+  "used_degraded_mode": false,
+  "qos_policy_id": "qos_voip"
+}
+\end{verbatim}
+
+Les valeurs possibles de \texttt{status} sont
+\texttt{known} et \texttt{unknown}. Pour une décision
+inconnue, \texttt{final\_class} vaut \texttt{null}.
+
+Les raisons de rejet peuvent notamment être :
+\texttt{LOW\_CONFIDENCE}, \texttt{CONFLICT},
+\texttt{INSUFFICIENT\_FEATURES}, \texttt{MODEL\_ERROR}
+ou \texttt{RULE\_ENGINE\_ERROR}.
+
+\subsection{Interfaces logicielles proposées}
+
+Dans une implémentation Python monolithique, les interfaces
+peuvent être réalisées sous forme de fonctions typées :
+
+\begin{verbatim}
+capture_packets(interface: str) -> Iterator[PacketObservation]
+
+update_flow(packet: PacketObservation) -> FlowState
+
+extract_features(flow: FlowState) -> FeatureVector
+
+preprocess_features(features: FeatureVector) -> ModelInput
+
+predict_ml(model_input: ModelInput) -> MLResult
+
+evaluate_rules(features: FeatureVector) -> RuleResult
+
+arbitrate(ml_result: MLResult,
+          rule_result: RuleResult) -> Decision
+
+apply_qos(decision: Decision) -> QoSResult
+
+log_event(event: AgentEvent) -> None
+\end{verbatim}
+
+Ces signatures constituent des contrats proposés.
+Les structures de données associées devront être définies
+dans l'implémentation.
+
+% ------------------------------------------------------------
+\section{Conception relationnelle et persistance des données}
+% ------------------------------------------------------------
+
+\subsection{Choix de persistance}
+
+Le modèle conceptuel présenté précédemment décrit les
+informations manipulées par l'agent. Si une conservation
+durable des flux, prédictions et décisions est nécessaire,
+il peut être traduit en schéma relationnel.
+
+Pour une expérimentation courte, les résultats peuvent
+également être conservés dans des fichiers CSV ou JSONL.
+Le choix final dépend du volume et des besoins de requêtage.
+
+\subsection{Proposition de modèle logique relationnel}
+
+\begin{itemize}
+    \item \textbf{FLUX}(\underline{id\_flux}, protocole,
+    ip\_source, ip\_destination, port\_source,
+    port\_destination, date\_debut, date\_fin).
+
+    \item \textbf{CARACTERISTIQUE}(\underline{id\_caracteristique},
+    \#id\_flux, window\_id, nombre\_paquets,
+    taille\_moyenne, variance, intervalle\_moyen,
+    duree\_observation).
+
+    \item \textbf{CLASSIFICATION}(\underline{id\_classification},
+    \#id\_flux, window\_id, modele, classe\_predite,
+    score, date).
+
+    \item \textbf{REGLE}(\underline{id\_regle}, condition,
+    classe\_suggeree, poids, etat).
+
+    \item \textbf{DECISION}(\underline{id\_decision},
+    \#id\_flux, window\_id, classe\_finale, statut,
+    score\_hybride, justification, date).
+
+    \item \textbf{POLITIQUE\_QOS}(\underline{id\_politique},
+    classe, dscp, priorite, parametres\_htb).
+
+    \item \textbf{DECISION\_REGLE}(\underline{id\_decision},
+    \underline{id\_regle}, resultat\_evaluation).
+\end{itemize}
+
+Les attributs soulignés représentent les clés primaires.
+Les attributs précédés de \# représentent les clés étrangères.
+
+Une décision peut référencer une politique QoS au moyen
+d'un attribut \texttt{id\_politique}, nullable lorsqu'aucune
+politique n'a été appliquée.
+
+Ce modèle logique reste une proposition. Les types SQL,
+les index et les contraintes physiques seront fixés
+lorsque le SGBD sera choisi.
+
+\subsection{Contraintes d'intégrité}
+
+\begin{itemize}
+    \item Les identifiants primaires sont uniques et non nuls.
+    \item Les ports sont compris entre 0 et 65535.
+    \item Les scores normalisés sont compris entre 0 et 1.
+    \item Le statut appartient à \texttt{known} ou \texttt{unknown}.
+    \item Une décision inconnue ne possède pas de classe finale.
+    \item Une politique QoS ne peut être appliquée qu'après
+    validation de la décision correspondante.
+\end{itemize}
+
+% ------------------------------------------------------------
+\section{Gestion des cas limites et modes dégradés}
+% ------------------------------------------------------------
+
+\subsection{Métadonnées absentes}
+
+Les champs SNI et DNS ne sont pas garantis. Leur absence
+peut résulter de TLS, ECH, QUIC, du DNS chiffré ou de limites
+de capture. Le système poursuit donc la classification à
+partir des caractéristiques comportementales disponibles.
+
+\subsection{Fenêtre d'observation insuffisante}
+
+Lorsque le nombre de paquets est inférieur au minimum requis,
+l'agent peut différer la décision et poursuivre l'observation.
+Si le maximum configuré est atteint sans obtenir suffisamment
+d'informations, le flux est marqué \texttt{UNKNOWN} avec
+la raison \texttt{INSUFFICIENT\_FEATURES}.
+
+\subsection{Flux expiré ou interrompu}
+
+Un flux inactif est clôturé après un délai configurable.
+Une décision tardive ne doit pas être appliquée à une
+communication qui n'est plus active.
+
+\subsection{Défaillance d'un composant}
+
+Une défaillance ML, symbolique ou QoS doit être représentée
+par un statut explicite. Le système applique uniquement
+un mode dégradé prévu et validé. À défaut, il conserve
+le comportement réseau par défaut et journalise l'erreur.
+
+\subsection{Surcharge et concurrence}
+
+Les états des flux doivent être isolés afin d'éviter
+le mélange de caractéristiques. Les files de traitement
+doivent être bornées et les délais d'attente configurables.
+En cas de surcharge, les pertes d'observation doivent
+être signalées.
+
+% ------------------------------------------------------------
+\section{Sécurité opérationnelle et traçabilité}
+% ------------------------------------------------------------
+
+\subsection{Validation des entrées}
+
+Les champs extraits des paquets sont considérés comme
+des données non fiables. Ils sont validés avant leur
+utilisation dans les règles, les journaux ou les commandes
+de configuration réseau.
+
+Les valeurs numériques doivent être finies et respecter
+les plages attendues. Les chaînes doivent être limitées
+en taille et correctement échappées lors de leur journalisation.
+
+\subsection{Privilèges minimaux}
+
+La capture et la configuration QoS nécessitent des privilèges
+spécifiques. Ces opérations doivent être isolées dans des
+composants dédiés disposant uniquement des droits nécessaires.
+
+\subsection{Journal d'audit}
+
+Pour chaque décision, le journal peut conserver :
+l'identifiant du flux, l'horodatage, la version du modèle,
+la version des règles, les scores, le statut, la raison
+d'acceptation ou de rejet et l'action QoS effectivement
+exécutée.
+
+% ------------------------------------------------------------
+\section{Plan de validation et critères d'acceptation technique}
+% ------------------------------------------------------------
+
+\subsection{Tests unitaires et tests d'intégration}
+
+\begin{table}[H]
+\centering
+\caption{Matrice de validation technique}
+\label{tab:validation_technique}
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Test} & \textbf{Comportement vérifié} &
+\textbf{Critère d'acceptation} \\
+\hline
+Flux connu & Accord ML et règles &
+Classe acceptée si les seuils sont atteints. \\
+\hline
+Flux inconnu & Observation non représentée à l'entraînement &
+Statut \texttt{UNKNOWN}. \\
+\hline
+Désaccord & Classes incompatibles proposées &
+Rejet ou mode prudent. \\
+\hline
+Métadonnées absentes & SNI et DNS indisponibles &
+Classification statistique maintenue. \\
+\hline
+Données invalides & Valeurs non finies ou champs invalides &
+Entrée rejetée ou signalée. \\
+\hline
+Panne d'un moteur & ML ou règles indisponibles &
+Mode dégradé explicite. \\
+\hline
+Échec QoS & Configuration refusée &
+Échec journalisé et politique de repli conservée. \\
+\hline
+Charge élevée & Plusieurs flux simultanés &
+Aucune association croisée des flux. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Répétabilité des expériences}
+
+Les configurations IA seule, règles seules et hybride
+doivent être évaluées sur les mêmes partitions de données.
+Les paramètres sont sélectionnés sur la validation et
+ne sont plus ajustés sur le test.
+
+Lorsque l'entraînement comporte une part aléatoire,
+plusieurs graines sont utilisées et les résultats sont
+rapportés sous forme de moyenne et de dispersion.
+
+Les partitions doivent éviter qu'une même communication
+ou capture apparaisse simultanément dans l'entraînement
+et le test.
+
+\subsection{Analyse complémentaire}
+
+Une étude d'ablation peut mesurer l'effet des règles
+symboliques, de l'arbitrage, de la calibration et du rejet.
+Les performances doivent être présentées conjointement
+avec la couverture, le taux de fausse acceptation des
+inconnus et le coût temporel ajouté par l'approche hybride.
+
+Pour la QoS, les mesures doivent être comparées avec
+et sans politiques, à charge et topologie identiques.
+
+
+
+
+% ============================================================
+% COMPLEMENTS APPROFONDIS DE LA CONCEPTION TECHNIQUE
+% A INSERER AVANT LA SECTION CONCLUSION
+% ============================================================
+
+% ------------------------------------------------------------
+\section{Spécification technique détaillée et fonctionnement interne}
+% ------------------------------------------------------------
+
+Cette section approfondit le fonctionnement interne de l'agent hybride. Elle précise les responsabilités des composants, les échanges entre les modules, le cycle de vie d'un flux et les mécanismes permettant de produire une décision cohérente à partir de plusieurs sources d'information.
+
+L'objectif est de passer d'une description architecturale générale à une spécification suffisamment précise pour guider l'implémentation logicielle.
+
+\subsection{Principes de conception logicielle}
+
+La conception repose sur les principes suivants :
+
+\begin{itemize}
+    \item \textbf{Séparation des responsabilités :} chaque composant possède une fonction clairement identifiée.
+    \item \textbf{Faible couplage :} un module ne doit pas dépendre des détails internes des autres modules.
+    \item \textbf{Interfaces explicites :} les échanges reposent sur des structures de données définies.
+    \item \textbf{Traçabilité :} chaque décision doit pouvoir être reliée au flux, aux caractéristiques observées et aux résultats des modules.
+    \item \textbf{Tolérance aux erreurs :} l'indisponibilité d'un composant ne doit pas provoquer une décision arbitraire.
+    \item \textbf{Extensibilité :} de nouveaux modèles, règles ou profils QoS doivent pouvoir être ajoutés sans reconstruire toute l'architecture.
+\end{itemize}
+
+La conception distingue trois catégories de composants :
+
+\begin{enumerate}
+    \item Les composants d'acquisition et de préparation des données.
+    \item Les composants d'analyse et de production des résultats.
+    \item Les composants décisionnels et opérationnels.
+\end{enumerate}
+
+Cette séparation permet notamment de tester indépendamment l'extraction des caractéristiques, le classifieur, le moteur symbolique et l'arbitre.
+
+\subsection{Responsabilités détaillées des composants}
+
+Le tableau suivant précise les responsabilités attendues de chaque composant.
+
+\begin{table}[H]
+\centering
+\caption{Spécification détaillée des responsabilités des composants}
+\label{tab:responsabilites_detaillees}
+\small
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Composant} & \textbf{Entrées principales} & \textbf{Sorties et responsabilités} \\
+\hline
+Capture réseau &
+Paquets reçus depuis l'interface réseau &
+Observations réseau horodatées et transmission au gestionnaire de flux. \\
+\hline
+Gestionnaire de flux &
+Paquets et informations de transport &
+Regroupement des paquets, identification des communications et suivi de leur durée de vie. \\
+\hline
+Extracteur &
+Paquets associés à un flux &
+Calcul des caractéristiques statistiques, temporelles et directionnelles. \\
+\hline
+Prétraitement &
+Vecteur brut de caractéristiques &
+Vérification, transformation et normalisation des données. \\
+\hline
+Classifieur ML &
+Vecteur prétraité &
+Classe prédite, scores par classe et informations sur le modèle utilisé. \\
+\hline
+Moteur symbolique &
+Métadonnées disponibles et caractéristiques &
+Règles activées, classe suggérée et justification symbolique. \\
+\hline
+Arbitre &
+Résultats ML et symboliques &
+Décision finale, score hybride, statut et motif de décision. \\
+\hline
+Gestionnaire QoS &
+Décision finale validée &
+Sélection et application d'une politique réseau autorisée. \\
+\hline
+Journalisation &
+Événements et résultats des composants &
+Enregistrement des observations, décisions, erreurs et actions. \\
+\hline
+Explicabilité &
+Prédiction ML et informations disponibles &
+Contribution des caractéristiques et justification de la décision. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Chaque composant doit exposer une interface stable. Par exemple, le gestionnaire de flux ne doit pas connaître l'architecture interne du modèle Random Forest. Il transmet uniquement un objet contenant les caractéristiques nécessaires au classifieur.
+
+De la même manière, le gestionnaire QoS ne doit pas recalculer la classification. Il reçoit une décision produite par l'arbitre et applique la politique correspondante lorsque les conditions de validation sont satisfaites.
+
+\subsection{Cycle de vie complet d'un flux}
+
+Le traitement d'une communication est organisé sous la forme d'un cycle de vie composé de plusieurs états.
+
+\begin{enumerate}
+    \item \textbf{OBSERVED :} un premier paquet correspondant à une nouvelle communication est détecté.
+    \item \textbf{COLLECTING :} les paquets suivants sont associés au flux et les informations nécessaires sont accumulées.
+    \item \textbf{FEATURES\_READY :} la fenêtre d'observation atteint les conditions nécessaires à l'extraction.
+    \item \textbf{ANALYZING :} les modules ML et symbolique réalisent leur analyse.
+    \item \textbf{DECIDED :} l'arbitre produit une décision ou un rejet.
+    \item \textbf{APPLIED :} la politique QoS correspondante est appliquée, si elle est autorisée.
+    \item \textbf{EXPIRED ou CLOSED :} le flux est terminé ou supprimé après expiration.
+\end{enumerate}
+
+Le cycle peut être représenté par le modèle conceptuel suivant :
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{c}
+\textbf{OBSERVED} \\
+$\downarrow$ \\
+\textbf{COLLECTING} \\
+$\downarrow$ \\
+\textbf{FEATURES\_READY} \\
+$\downarrow$ \\
+\textbf{ANALYZING} \\
+$\downarrow$ \\
+\textbf{DECIDED} \\
+$\downarrow$ \\
+\textbf{APPLIED} \\
+$\downarrow$ \\
+\textbf{CLOSED / EXPIRED}
+\end{tabular}
+\caption{Cycle de vie conceptuel d'un flux}
+\label{fig:cycle_vie_flux}
+\end{figure}
+
+Une transition vers un état d'erreur peut intervenir à différentes étapes. Par exemple, une capture interrompue peut empêcher la constitution d'une fenêtre d'observation suffisante.
+
+Dans ce cas, le système doit enregistrer l'événement et éviter de transmettre au classifieur un vecteur incomplet présenté comme une observation valide.
+
+\subsection{Gestion de l'identité et de l'état des flux}
+
+Chaque flux doit disposer d'un identifiant interne unique, appelé \texttt{flow\_id}.
+
+Cet identifiant permet de relier les différentes opérations réalisées pendant le cycle de vie de la communication.
+
+Une structure logique peut être définie comme suit :
+
+\begin{verbatim}
+FlowContext:
+    flow_id
+    protocol
+    source_address
+    destination_address
+    source_port
+    destination_port
+    start_timestamp
+    last_seen_timestamp
+    packet_count
+    forward_packets
+    backward_packets
+    packet_observations
+    current_state
+    classification_status
+\end{verbatim}
+
+Le gestionnaire de flux doit également prendre en compte les communications bidirectionnelles.
+
+Pour éviter de considérer une même communication comme deux flux indépendants, une clé canonique peut être construite à partir des deux extrémités.
+
+Pour un flux TCP ou UDP, une représentation conceptuelle est :
+
+\[
+K(F)=\operatorname{canonical}
+\left(
+(IP_s,P_s),(IP_d,P_d),Proto
+\right)
+\]
+
+La fonction \texttt{canonical} doit produire une représentation identique quelle que soit la direction du paquet.
+
+Il convient néanmoins de conserver la direction d'origine de chaque paquet afin de calculer les caractéristiques avant et arrière.
+
+Pour les protocoles multiplexés, notamment QUIC, cette identification reste une approximation au niveau transport. Une connexion ne correspond pas nécessairement à une seule activité applicative.
+
+\subsection{Définition des conditions de déclenchement de la classification}
+
+La classification précoce nécessite de définir des conditions précises de déclenchement.
+
+La décision peut être déclenchée lorsque :
+
+\begin{itemize}
+    \item le nombre minimal de paquets est atteint ;
+    \item la durée minimale d'observation est respectée ;
+    \item les caractéristiques obligatoires sont disponibles ;
+    \item le vecteur obtenu respecte le schéma attendu par le modèle.
+\end{itemize}
+
+On peut définir une condition logique :
+
+\[
+Ready(F)=
+(N_F\geq N_{\min})
+\land
+(V_F=1)
+\land
+(T_F\geq T_{\min})
+\]
+
+où :
+
+\begin{itemize}
+    \item $N_F$ représente le nombre de paquets observés ;
+    \item $N_{\min}$ représente le nombre minimal de paquets ;
+    \item $V_F$ indique si le vecteur est valide ;
+    \item $T_F$ représente la durée d'observation ;
+    \item $T_{\min}$ représente la durée minimale éventuelle.
+\end{itemize}
+
+Les paramètres $N_{\min}$ et $T_{\min}$ doivent être déterminés expérimentalement.
+
+Il ne faut pas imposer une durée minimale excessive, car cela réduirait l'intérêt de la classification précoce. À l'inverse, une observation trop courte peut produire des caractéristiques insuffisantes pour distinguer certaines catégories.
+
+% ------------------------------------------------------------
+\section{Spécification approfondie du moteur d'arbitrage hybride}
+% ------------------------------------------------------------
+
+\subsection{Problématique de la fusion des résultats}
+
+Le classifieur ML et le moteur symbolique peuvent produire des résultats différents pour un même flux.
+
+Cette situation est normale, car les deux mécanismes ne reposent pas sur les mêmes informations.
+
+Le classifieur ML apprend des relations statistiques à partir des données d'entraînement. Le moteur symbolique exploite des connaissances explicites, notamment les métadonnées disponibles et les conditions définies dans les règles.
+
+L'arbitre doit donc éviter une fusion naïve des résultats.
+
+Il doit distinguer :
+
+\begin{itemize}
+    \item l'accord entre les deux sources ;
+    \item le désaccord entre les deux sources ;
+    \item l'absence de résultat symbolique ;
+    \item l'indisponibilité d'un composant ;
+    \item l'insuffisance de confiance ;
+    \item la présence d'indices indiquant une classe inconnue.
+\end{itemize}
+
+La décision finale ne doit pas être déterminée uniquement par la valeur numérique la plus élevée.
+
+\subsection{Représentation normalisée des résultats}
+
+Pour permettre une comparaison cohérente, chaque module doit produire un résultat structuré.
+
+Pour le classifieur ML, on définit :
+
+\[
+R_{ML}=(\hat{c}_{ML},P_{ML},v_{ML})
+\]
+
+où :
+
+\begin{itemize}
+    \item $\hat{c}_{ML}$ est la classe prédite ;
+    \item $P_{ML}$ est le vecteur des scores associés aux classes ;
+    \item $v_{ML}$ indique la validité du résultat.
+\end{itemize}
+
+Le vecteur des scores est :
+
+\[
+P_{ML}=
+\left(
+p_1,p_2,\ldots,p_K
+\right)
+\]
+
+avec :
+
+\[
+p_k\in[0,1]
+\]
+
+Lorsque les scores sont interprétés comme des probabilités, leur calibration doit être vérifiée.
+
+Pour le moteur symbolique, on définit :
+
+\[
+R_R=(\hat{c}_R,S_R,A_R,v_R)
+\]
+
+où :
+
+\begin{itemize}
+    \item $\hat{c}_R$ est la classe suggérée par les règles ;
+    \item $S_R$ est le score symbolique ;
+    \item $A_R$ représente l'ensemble des règles activées ;
+    \item $v_R$ indique la validité du résultat.
+\end{itemize}
+
+L'absence de règle activée doit être représentée explicitement. Elle ne doit pas être interprétée comme une preuve que la classe prédite par le modèle est incorrecte.
+
+\subsection{Normalisation des scores}
+
+Les scores issus des deux mécanismes ne possèdent pas nécessairement la même signification.
+
+Un score ML peut représenter une probabilité estimée, tandis qu'un score symbolique peut représenter une combinaison de poids attribués aux règles.
+
+Il est donc nécessaire de distinguer :
+
+\begin{itemize}
+    \item les probabilités produites par le modèle ;
+    \item les scores de correspondance des règles ;
+    \item les scores de confiance calibrés ;
+    \item les scores hybrides calculés par l'arbitre.
+\end{itemize}
+
+Si les deux sources doivent être combinées numériquement, une transformation préalable doit être définie.
+
+On peut représenter les scores normalisés par :
+
+\[
+\widetilde{P}_{ML}(c)
+=
+Cal_{ML}(P_{ML}(c))
+\]
+
+\[
+\widetilde{S}_{R}(c)
+=
+Norm_R(S_R(c))
+\]
+
+La fonction $Cal_{ML}$ correspond à une éventuelle calibration du modèle.
+
+La fonction $Norm_R$ transforme le score symbolique dans une échelle compatible.
+
+Ces transformations doivent être définies et validées sur des données indépendantes de l'ensemble de test.
+
+\subsection{Calcul du score hybride}
+
+Une stratégie de fusion pondérée peut être utilisée lorsque les deux résultats sont valides et comparables.
+
+Le score hybride d'une classe $c$ est défini par :
+
+\[
+S_H(c|X)=
+\alpha\widetilde{P}_{ML}(c|X)
++
+\beta\widetilde{S}_{R}(c|X)
+\]
+
+avec :
+
+\[
+\alpha+\beta=1
+\]
+
+et :
+
+\[
+\alpha,\beta\in[0,1]
+\]
+
+Les coefficients représentent l'importance attribuée à chaque source.
+
+Ils ne doivent pas être fixés arbitrairement. Leur choix doit être étudié à partir des performances obtenues sur l'ensemble de validation.
+
+Lorsque le moteur symbolique ne dispose d'aucune preuve exploitable, il ne faut pas lui attribuer automatiquement un score nul qui pénaliserait le classifieur.
+
+Dans ce cas, une stratégie de fusion adaptée peut utiliser uniquement le résultat ML valide, tout en indiquant que la décision repose sur une seule source.
+
+\subsection{Gestion de l'accord entre les sources}
+
+Lorsque les deux mécanismes proposent la même classe, l'arbitre peut considérer cette convergence comme un indice favorable.
+
+Cependant, l'accord ne constitue pas une garantie absolue de correction.
+
+Les deux mécanismes peuvent partager des biais ou exploiter des informations insuffisantes.
+
+La décision doit donc également prendre en compte les seuils de confiance et la validité des observations.
+
+On peut définir la condition :
+
+\[
+Agreement=
+(\hat{c}_{ML}=\hat{c}_R)
+\]
+
+Si cette condition est vraie et que les scores dépassent les seuils définis, la classe commune peut être acceptée.
+
+\subsection{Gestion du désaccord}
+
+Lorsque :
+
+\[
+\hat{c}_{ML}\neq\hat{c}_R
+\]
+
+l'arbitre doit identifier la nature du désaccord.
+
+Plusieurs situations sont possibles :
+
+\begin{itemize}
+    \item le modèle ML présente une confiance élevée et les règles sont peu spécifiques ;
+    \item les règles présentent une correspondance forte et le modèle ML est incertain ;
+    \item les deux mécanismes présentent des scores élevés pour des classes différentes ;
+    \item les deux mécanismes présentent des scores faibles.
+\end{itemize}
+
+Un désaccord important ne doit pas conduire automatiquement à choisir la classe possédant le score brut le plus élevé.
+
+Une politique conservatrice consiste à rejeter le flux lorsque les sources fournissent des indications incompatibles et suffisamment fortes.
+
+\subsection{Politique de décision proposée}
+
+La politique suivante distingue les situations principales.
+
+\begin{table}[H]
+\centering
+\caption{Politique détaillée de l'arbitre hybride}
+\label{tab:politique_arbitrage_detaillee}
+\small
+\begin{tabularx}{\textwidth}{|X|X|X|}
+\hline
+\textbf{Situation} & \textbf{Condition} & \textbf{Décision proposée} \\
+\hline
+Accord fiable &
+Les deux sources proposent la même classe et les seuils sont respectés. &
+Accepter la classe commune. \\
+\hline
+Accord incertain &
+Les deux sources proposent la même classe, mais les scores sont insuffisants. &
+Rejeter ou différer la décision. \\
+\hline
+ML seul exploitable &
+Le modèle est valide et aucune preuve symbolique exploitable n'est disponible. &
+Utiliser le résultat ML si son seuil est satisfait et si la politique l'autorise. \\
+\hline
+Règles seules exploitables &
+Le modèle est indisponible et une règle suffisamment spécifique est activée. &
+Appliquer une décision symbolique uniquement si cette stratégie est autorisée. \\
+\hline
+Désaccord fort &
+Les deux sources proposent des classes différentes avec des scores élevés. &
+Rejeter la classification ou demander une observation complémentaire. \\
+\hline
+Scores insuffisants &
+Aucune classe ne dépasse le seuil minimal. &
+Déclarer le flux inconnu ou incertain. \\
+\hline
+Erreur de traitement &
+Les données ou les résultats d'un composant sont invalides. &
+Déclarer une erreur et appliquer le mode de repli. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Cette politique permet de distinguer le rejet d'un flux inconnu du rejet provoqué par une erreur technique.
+
+Ces deux situations doivent posséder des statuts différents dans les journaux.
+
+\subsection{Mécanisme de rejet des flux inconnus}
+
+Le système évolue dans un environnement ouvert. Les catégories réellement observées peuvent donc être différentes de celles présentes dans les données d'entraînement.
+
+Un classifieur traditionnel attribue généralement une classe parmi les catégories connues, même lorsque le flux est très éloigné des données d'apprentissage.
+
+Le mécanisme de rejet vise à limiter ce comportement.
+
+On définit le score maximal :
+
+\[
+S_{\max}(X)=\max_{c\in C}S_H(c|X)
+\]
+
+On définit également la marge entre les deux meilleurs scores :
+
+\[
+M(X)=S_{(1)}(X)-S_{(2)}(X)
+\]
+
+où $S_{(1)}$ et $S_{(2)}$ représentent respectivement le premier et le deuxième meilleur score.
+
+Une décision peut être acceptée lorsque :
+
+\[
+S_{\max}(X)\geq\tau
+\]
+
+et :
+
+\[
+M(X)\geq\mu
+\]
+
+où :
+
+\begin{itemize}
+    \item $\tau$ est le seuil minimal de confiance ;
+    \item $\mu$ est la marge minimale entre les deux meilleures classes.
+\end{itemize}
+
+Ces deux conditions permettent de distinguer une prédiction suffisamment forte d'une situation dans laquelle plusieurs classes sont difficilement séparables.
+
+Les valeurs de $\tau$ et $\mu$ doivent être déterminées expérimentalement.
+
+Le rejet peut également prendre en compte la cohérence entre les sources, la disponibilité des caractéristiques et les résultats des règles symboliques.
+
+\subsection{Pseudo-code de l'arbitrage}
+
+L'algorithme suivant décrit le fonctionnement logique proposé.
+
+\begin{verbatim}
+function arbitrate(ml_result, rule_result, thresholds):
+
+    if not ml_result.valid and not rule_result.valid:
+        return ERROR
+
+    if ml_result.valid:
+        ml_scores = validate_scores(ml_result.scores)
+
+        if ml_scores.invalid:
+            return ERROR
+
+    if rule_result.valid:
+        rule_scores = validate_rule_scores(
+            rule_result.scores
+        )
+
+        if rule_scores.invalid:
+            return ERROR
+
+    if ml_result.valid and rule_result.valid:
+
+        ml_class = ml_result.predicted_class
+        rule_class = rule_result.suggested_class
+
+        if rule_result.has_evidence:
+            scores = normalize_and_fuse(
+                ml_result,
+                rule_result
+            )
+        else:
+            scores = ml_scores
+
+    elif ml_result.valid:
+        scores = ml_scores
+
+    else:
+        if rule_result.has_specific_evidence:
+            return symbolic_decision(rule_result)
+        else:
+            return UNKNOWN
+
+    best_class = argmax(scores)
+    best_score = max(scores)
+    margin = compute_margin(scores)
+
+    if best_score < thresholds.min_score:
+        return UNKNOWN
+
+    if margin < thresholds.min_margin:
+        return UNCERTAIN
+
+    if sources_strongly_disagree(
+        ml_result,
+        rule_result
+    ):
+        return REJECTED
+
+    return ACCEPTED(best_class, best_score)
+\end{verbatim}
+
+Ce pseudo-code constitue une spécification fonctionnelle. Les fonctions de normalisation, de fusion et de détection des désaccords doivent être implémentées selon les modèles et les règles effectivement retenus.
+
+% ------------------------------------------------------------
+\section{Spécification détaillée des interfaces logicielles}
+% ------------------------------------------------------------
+
+\subsection{Objectif des contrats d'interface}
+
+Les interfaces définissent les informations qu'un composant peut recevoir, les résultats qu'il doit retourner et les erreurs qu'il peut signaler.
+
+Elles permettent d'éviter les dépendances implicites entre modules.
+
+Chaque interface doit préciser :
+
+\begin{itemize}
+    \item le nom de l'opération ;
+    \item les paramètres obligatoires ;
+    \item les paramètres facultatifs ;
+    \item les types de données ;
+    \item les unités utilisées ;
+    \item les valeurs autorisées ;
+    \item la structure du résultat ;
+    \item les erreurs possibles.
+\end{itemize}
+
+Les contrats ci-dessous peuvent être utilisés avec des fonctions Python ou avec des échanges JSON.
+
+\subsection{Contrat du gestionnaire de flux}
+
+Le gestionnaire de flux reçoit les observations produites par le module de capture.
+
+Son rôle est de regrouper les paquets, de maintenir l'état des communications et de déclencher l'extraction lorsque les conditions sont satisfaites.
+
+Interface proposée :
+
+\begin{verbatim}
+update_flow(packet) -> FlowContext
+
+get_flow(flow_id) -> FlowContext
+
+is_ready(flow_id) -> Boolean
+
+expire_flow(flow_id) -> Boolean
+
+close_flow(flow_id) -> FlowSummary
+\end{verbatim}
+
+Les opérations doivent respecter les contraintes suivantes :
+
+\begin{itemize}
+    \item Un paquet invalide ne doit pas modifier l'état d'un flux.
+    \item Un paquet appartenant à un flux existant doit mettre à jour son horodatage.
+    \item Un nouveau flux doit recevoir un identifiant unique.
+    \item Un flux expiré ne doit pas être traité comme une communication active.
+    \item Les compteurs directionnels doivent rester cohérents avec les paquets observés.
+\end{itemize}
+
+\subsection{Contrat de l'extracteur de caractéristiques}
+
+L'extracteur transforme les observations d'un flux en vecteur numérique.
+
+Interface proposée :
+
+\begin{verbatim}
+extract_features(flow_context) -> FeatureVector
+\end{verbatim}
+
+Le résultat doit contenir les informations suivantes :
+
+\begin{verbatim}
+{
+    "flow_id": "flow_001",
+    "feature_version": "1.0",
+    "packet_count": 10,
+    "mean_packet_size": 180.5,
+    "std_packet_size": 35.2,
+    "mean_interarrival_time": 0.02,
+    "duration": 1.8,
+    "forward_count": 6,
+    "backward_count": 4,
+    "direction_ratio": 0.60,
+    "valid": true
+}
+\end{verbatim}
+
+Les unités doivent être uniformisées :
+
+\begin{itemize}
+    \item tailles des paquets : octets ;
+    \item durée : secondes ;
+    \item intervalles temporels : secondes ;
+    \item ratios : valeurs comprises entre 0 et 1 lorsque cette convention est retenue ;
+    \item compteurs : nombres entiers non négatifs.
+\end{itemize}
+
+Le champ \texttt{feature\_version} permet de vérifier la compatibilité entre le vecteur extrait et le modèle utilisé.
+
+Une modification de l'ordre des caractéristiques ou de leur méthode de calcul doit entraîner une mise à jour de cette version.
+
+\subsection{Contrat du prétraitement}
+
+Interface proposée :
+
+\begin{verbatim}
+preprocess(feature_vector, preprocessing_config)
+    -> ProcessedFeatureVector
+\end{verbatim}
+
+Le prétraitement doit vérifier :
+
+\begin{enumerate}
+    \item la présence des caractéristiques obligatoires ;
+    \item la conformité de leurs types ;
+    \item l'absence de valeurs infinies ;
+    \item la cohérence des plages de valeurs ;
+    \item l'ordre attendu par le modèle ;
+    \item la compatibilité de la version des caractéristiques.
+\end{enumerate}
+
+Les valeurs manquantes ne doivent pas être remplacées arbitrairement.
+
+La stratégie de traitement doit être définie lors de la conception du modèle : rejet de l'observation, imputation contrôlée ou utilisation d'un modèle capable de gérer les valeurs manquantes.
+
+Les paramètres de normalisation doivent être sauvegardés avec le modèle afin de garantir la reproductibilité des prédictions.
+
+\subsection{Contrat du classifieur ML}
+
+Interface proposée :
+
+\begin{verbatim}
+predict(processed_features)
+    -> MLResult
+\end{verbatim}
+
+La sortie doit contenir :
+
+\begin{verbatim}
+{
+    "flow_id": "flow_001",
+    "model_name": "RandomForest",
+    "model_version": "1.0",
+    "predicted_class": "VoIP",
+    "class_scores": {
+        "VoIP": 0.92,
+        "Video": 0.05,
+        "Web": 0.03
+    },
+    "valid": true
+}
+\end{verbatim}
+
+Le module doit garantir que les scores correspondent aux classes connues du modèle.
+
+Il doit également signaler les situations suivantes :
+
+\begin{itemize}
+    \item modèle non chargé ;
+    \item incompatibilité entre le vecteur et le modèle ;
+    \item erreur pendant la prédiction ;
+    \item score non numérique ;
+    \item score non fini ;
+    \item classe prédite absente de la liste des classes autorisées.
+\end{itemize}
+
+\subsection{Contrat du moteur symbolique}
+
+Interface proposée :
+
+\begin{verbatim}
+evaluate_rules(flow_context, feature_vector)
+    -> RuleResult
+\end{verbatim}
+
+Le résultat peut être représenté ainsi :
+
+\begin{verbatim}
+{
+    "flow_id": "flow_001",
+    "activated_rules": [
+        "R1",
+        "R2"
+    ],
+    "suggested_class": "VoIP",
+    "rule_score": 0.85,
+    "evidence_available": true,
+    "valid": true
+}
+\end{verbatim}
+
+Chaque règle doit disposer d'un identifiant unique et d'une description.
+
+Une règle peut également posséder :
+
+\begin{itemize}
+    \item une condition ;
+    \item une classe associée ;
+    \item un poids ;
+    \item un niveau de spécificité ;
+    \item une priorité ;
+    \item un état d'activation ;
+    \item une justification.
+\end{itemize}
+
+Le moteur doit conserver la liste des règles effectivement activées pour permettre l'explication de la décision.
+
+\subsection{Contrat de l'arbitre}
+
+Interface proposée :
+
+\begin{verbatim}
+arbitrate(ml_result, rule_result, config)
+    -> DecisionResult
+\end{verbatim}
+
+Le résultat doit distinguer la classe finale, le statut et le motif de décision.
+
+Exemple :
+
+\begin{verbatim}
+{
+    "flow_id": "flow_001",
+    "final_class": "VoIP",
+    "status": "known",
+    "hybrid_score": 0.89,
+    "decision_reason": "ML and rules agree",
+    "activated_rules": ["R1", "R2"],
+    "qos_policy": "high_priority"
+}
+\end{verbatim}
+
+Lorsque le flux est rejeté, la classe finale doit être nulle et le statut doit indiquer explicitement le rejet.
+
+Exemple :
+
+\begin{verbatim}
+{
+    "flow_id": "flow_002",
+    "final_class": null,
+    "status": "unknown",
+    "hybrid_score": 0.31,
+    "decision_reason": "Insufficient confidence",
+    "qos_policy": "best_effort"
+}
+\end{verbatim}
+
+Il faut distinguer les statuts suivants :
+
+\begin{itemize}
+    \item \texttt{known} : une classe connue a été acceptée ;
+    \item \texttt{unknown} : le flux ne peut pas être rattaché de manière fiable à une classe connue ;
+    \item \texttt{uncertain} : les informations disponibles sont ambiguës ;
+    \item \texttt{rejected} : la politique de décision refuse la classification ;
+    \item \texttt{error} : une erreur technique empêche la production d'une décision valide.
+\end{itemize}
+
+\subsection{Gestion des erreurs dans les interfaces}
+
+Chaque opération doit retourner un résultat cohérent.
+
+Une erreur ne doit pas être représentée par une classe fictive ou par un score nul non documenté.
+
+Une structure d'erreur commune peut être définie :
+
+\begin{verbatim}
+{
+    "flow_id": "flow_001",
+    "status": "error",
+    "error_code": "MODEL_UNAVAILABLE",
+    "error_message": "Model could not be loaded",
+    "component": "MLClassifier"
+}
+\end{verbatim}
+
+Les codes d'erreur doivent être stables afin de faciliter le traitement automatique et l'analyse des journaux.
+
+% ------------------------------------------------------------
+\section{Conception détaillée de la persistance et de la traçabilité}
+% ------------------------------------------------------------
+
+\subsection{Objectifs de la persistance}
+
+La persistance permet de conserver les informations nécessaires à l'analyse du fonctionnement de l'agent.
+
+Elle doit notamment permettre :
+
+\begin{itemize}
+    \item de retrouver les caractéristiques d'un flux ;
+    \item de comparer les prédictions produites par plusieurs modèles ;
+    \item de connaître les règles activées ;
+    \item de retrouver la décision finale ;
+    \item d'identifier la politique QoS appliquée ;
+    \item d'analyser les erreurs et les rejets.
+\end{itemize}
+
+La persistance peut être réalisée à l'aide d'une base relationnelle ou d'un stockage structuré adapté à l'environnement expérimental.
+
+Le modèle suivant constitue une proposition de structuration logique. Il devra être adapté aux besoins réels de l'implémentation.
+
+\subsection{Modèle logique des relations}
+
+Les principales relations proposées sont :
+
+\begin{itemize}
+    \item \textbf{FLUX} : décrit les communications observées.
+    \item \textbf{CARACTERISTIQUE} : conserve les caractéristiques extraites.
+    \item \textbf{CLASSIFICATION} : conserve les résultats des modèles.
+    \item \textbf{REGLE} : décrit les règles symboliques.
+    \item \textbf{DECISION} : conserve les décisions de l'arbitre.
+    \item \textbf{DECISION\_REGLE} : relie les décisions aux règles activées.
+    \item \textbf{POLITIQUE\_QOS} : décrit les politiques de traitement réseau.
+    \item \textbf{ACTION\_QOS} : conserve les actions réellement exécutées.
+\end{itemize}
+
+\subsection{Proposition de schéma relationnel}
+
+\begin{table}[H]
+\centering
+\caption{Proposition des relations et de leurs clés}
+\label{tab:schema_relationnel_detaille}
+\small
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Relation} & \textbf{Clé primaire} & \textbf{Attributs et références principales} \\
+\hline
+FLUX &
+id\_flux &
+protocole, adresses, ports, date\_debut, date\_fin, état. \\
+\hline
+CARACTERISTIQUE &
+id\_caracteristique &
+id\_flux, version, nombre\_paquets, taille\_moyenne, variance, durée. \\
+\hline
+CLASSIFICATION &
+id\_classification &
+id\_flux, modèle, version, classe\_predite, scores, date. \\
+\hline
+REGLE &
+id\_regle &
+condition, classe\_suggeree, poids, priorité, état. \\
+\hline
+DECISION &
+id\_decision &
+id\_flux, id\_classification, classe\_finale, statut, score, justification. \\
+\hline
+DECISION\_REGLE &
+id\_decision, id\_regle &
+association entre une décision et les règles activées. \\
+\hline
+POLITIQUE\_QOS &
+id\_politique &
+classe, DSCP, priorité, paramètres de débit. \\
+\hline
+ACTION\_QOS &
+id\_action &
+id\_decision, id\_politique, résultat, date\_application. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Les relations doivent respecter les contraintes d'intégrité suivantes :
+
+\begin{itemize}
+    \item Chaque caractéristique référence un flux existant.
+    \item Chaque classification référence un flux existant.
+    \item Chaque décision référence le flux concerné.
+    \item Chaque association décision-règle référence une décision et une règle existantes.
+    \item Chaque action QoS référence une décision et une politique valides.
+    \item Une décision inconnue ne doit pas posséder une classe finale fictive.
+\end{itemize}
+
+\subsection{Gestion des versions}
+
+La conservation des versions est importante pour reproduire les résultats.
+
+Il est recommandé d'associer à chaque classification :
+
+\begin{itemize}
+    \item le nom du modèle ;
+    \item la version du modèle ;
+    \item la version du prétraitement ;
+    \item la version du schéma de caractéristiques ;
+    \item la date de prédiction.
+\end{itemize}
+
+Cette organisation permet de distinguer les décisions produites par différentes versions du classifieur.
+
+Elle facilite également l'analyse des évolutions de performances après une modification des données ou de l'algorithme.
+
+\subsection{Traçabilité d'une décision}
+
+Une décision doit pouvoir être reconstruite à partir des informations conservées.
+
+La chaîne de traçabilité est la suivante :
+
+\[
+Flux
+\rightarrow
+Caracteristiques
+\rightarrow
+Predictions
+\rightarrow
+Regles
+\rightarrow
+Decision
+\rightarrow
+Action\ QoS
+\]
+
+Pour chaque décision, le système doit conserver autant que possible :
+
+\begin{itemize}
+    \item l'identifiant du flux ;
+    \item la date de traitement ;
+    \item le vecteur de caractéristiques ou sa référence ;
+    \item les résultats ML ;
+    \item les règles activées ;
+    \item les scores utilisés ;
+    \item le résultat de l'arbitrage ;
+    \item la politique QoS sélectionnée ;
+    \item le résultat de son application.
+\end{itemize}
+
+Les données enregistrées doivent être limitées aux informations nécessaires à l'expérimentation et à l'audit technique.
+
+% ------------------------------------------------------------
+\section{Gestion approfondie des cas limites et des modes dégradés}
+% ------------------------------------------------------------
+
+\subsection{Absence de métadonnées applicatives}
+
+Les informations SNI et DNS ne sont pas systématiquement disponibles.
+
+Cette absence peut résulter de plusieurs situations :
+
+\begin{itemize}
+    \item chiffrement des informations de négociation ;
+    \item utilisation d'Encrypted Client Hello ;
+    \item utilisation de DNS over HTTPS ou DNS over TLS ;
+    \item absence d'une requête DNS visible pendant la capture ;
+    \item utilisation d'une adresse IP déjà connue par le client ;
+    \item présence d'un tunnel ou d'un intermédiaire réseau.
+\end{itemize}
+
+Le moteur symbolique ne doit donc pas considérer l'absence de ces informations comme une erreur.
+
+Il doit simplement indiquer que les éléments correspondants ne sont pas disponibles.
+
+Dans cette situation, la classification peut continuer à partir des caractéristiques statistiques et temporelles.
+
+\subsection{Observation insuffisante}
+
+Un flux peut ne contenir qu'un petit nombre de paquets avant sa fermeture.
+
+Le vecteur de caractéristiques obtenu peut alors être incomplet ou peu représentatif.
+
+Le système doit distinguer :
+
+\begin{itemize}
+    \item un flux valide mais insuffisamment observé ;
+    \item un flux contenant des données invalides ;
+    \item un flux dont la capture a été interrompue ;
+    \item un flux terminé avant le déclenchement de la classification.
+\end{itemize}
+
+Une observation insuffisante ne doit pas être automatiquement considérée comme un flux inconnu.
+
+Le système peut conserver le statut \texttt{insufficient\_observation} et différer la décision lorsque cela reste possible.
+
+\subsection{Valeurs aberrantes et caractéristiques incohérentes}
+
+Les caractéristiques extraites peuvent contenir des valeurs inattendues à cause d'une erreur de capture, d'un problème de calcul ou d'une observation inhabituelle.
+
+Les contrôles suivants sont nécessaires :
+
+\begin{itemize}
+    \item les compteurs doivent être non négatifs ;
+    \item les durées doivent être positives ou nulles selon leur définition ;
+    \item les tailles doivent respecter les contraintes de représentation choisies ;
+    \item les ratios doivent respecter leur domaine ;
+    \item les valeurs numériques doivent être finies ;
+    \item les horodatages doivent respecter un ordre cohérent.
+\end{itemize}
+
+Une valeur aberrante ne doit pas être corrigée silencieusement si cette correction modifie le sens de l'observation.
+
+La stratégie retenue doit être documentée : rejet, limitation contrôlée ou transformation définie pendant le prétraitement.
+
+\subsection{Indisponibilité du classifieur ML}
+
+Si le modèle ne peut pas être chargé ou si une prédiction échoue, l'arbitre doit recevoir un état d'indisponibilité.
+
+Une décision symbolique peut éventuellement être produite si une règle suffisamment spécifique est activée et si la politique opérationnelle l'autorise.
+
+Dans le cas contraire, le flux doit rester non classifié.
+
+Il ne faut pas réutiliser automatiquement une ancienne prédiction pour un nouveau flux.
+
+\subsection{Indisponibilité du moteur symbolique}
+
+Si le moteur de règles est indisponible, le classifieur ML peut continuer à produire des prédictions.
+
+Cependant, la décision doit indiquer qu'elle repose uniquement sur le modèle.
+
+Le système doit conserver cette information dans les journaux afin de ne pas confondre une classification hybride et une classification ML seule.
+
+\subsection{Saturation et concurrence}
+
+Plusieurs flux peuvent être observés simultanément.
+
+Le gestionnaire de flux doit donc éviter les modifications concurrentes incohérentes.
+
+Les mécanismes suivants peuvent être envisagés :
+
+\begin{itemize}
+    \item une structure de données indexée par identifiant de flux ;
+    \item une synchronisation des opérations de mise à jour ;
+    \item une file de traitement pour les flux prêts à classifier ;
+    \item une limite de taille pour les files d'attente ;
+    \item une stratégie de nettoyage des flux expirés ;
+    \item une surveillance de la mémoire consommée.
+\end{itemize}
+
+Lorsque la charge devient trop importante, le système doit enregistrer les pertes d'observation ou les retards de traitement.
+
+Une surcharge ne doit pas être masquée par une diminution silencieuse du nombre de paquets traités.
+
+\subsection{Matrice des modes dégradés}
+
+\begin{table}[H]
+\centering
+\caption{Comportements attendus dans les situations dégradées}
+\label{tab:modes_degrades}
+\small
+\begin{tabularx}{\textwidth}{|X|X|X|}
+\hline
+\textbf{Situation} & \textbf{Comportement du système} & \textbf{Conséquence décisionnelle} \\
+\hline
+SNI absent &
+Poursuite de l'extraction statistique. &
+Aucune pénalisation automatique. \\
+\hline
+DNS absent &
+Poursuite sans métadonnée DNS. &
+Décision fondée sur les informations restantes. \\
+\hline
+Fenêtre insuffisante &
+Attente ou déclaration d'observation insuffisante. &
+Pas de classification forcée. \\
+\hline
+Modèle indisponible &
+Signalement de l'erreur au moteur décisionnel. &
+Repli symbolique autorisé ou absence de décision. \\
+\hline
+Règles indisponibles &
+Utilisation éventuelle du résultat ML. &
+Décision identifiée comme ML seule. \\
+\hline
+Désaccord fort &
+Application de la politique de rejet. &
+Aucune classe arbitraire. \\
+\hline
+Échec QoS &
+Enregistrement de l'échec. &
+Conservation de la politique réseau de repli. \\
+\hline
+Saturation &
+Limitation contrôlée et journalisation. &
+Dégradation signalée explicitement. \\
+\hline
+\end{tabularx}
+\end{table}
+
+% ------------------------------------------------------------
+\section{Spécification opérationnelle de la couche QoS}
+% ------------------------------------------------------------
+
+\subsection{Séparation entre décision et action réseau}
+
+La décision de classification et l'application de la QoS doivent être séparées.
+
+L'arbitre détermine la classe et le statut du flux.
+
+Le gestionnaire QoS vérifie ensuite si cette décision autorise une action réseau.
+
+Cette séparation est importante, car une classification correcte ne signifie pas nécessairement qu'une modification de la configuration réseau est autorisée.
+
+La chaîne de traitement est :
+
+\[
+Decision
+\rightarrow
+Validation
+\rightarrow
+Selection\ de\ politique
+\rightarrow
+Application
+\rightarrow
+Verification
+\]
+
+\subsection{Conditions d'application d'une politique}
+
+Avant toute modification, le gestionnaire QoS doit vérifier :
+
+\begin{itemize}
+    \item que la décision possède un identifiant valide ;
+    \item que le statut autorise l'application d'une politique ;
+    \item que la classe appartient à la liste des catégories autorisées ;
+    \item que la politique sélectionnée existe ;
+    \item que les paramètres de la politique respectent les limites configurées ;
+    \item que l'action est compatible avec l'interface réseau concernée.
+\end{itemize}
+
+Les flux inconnus ou incertains doivent être associés à une politique de repli prudente, par exemple Best Effort, selon la configuration retenue.
+
+\subsection{Gestion du cycle de vie des règles QoS}
+
+L'application d'une politique doit également prendre en compte la durée de vie du flux.
+
+Une règle associée à un flux terminé ne doit pas rester active indéfiniment.
+
+Le gestionnaire QoS doit donc assurer :
+
+\begin{enumerate}
+    \item la création de la règle ;
+    \item la vérification de son application ;
+    \item son association avec l'identifiant du flux ;
+    \item sa mise à jour si la décision évolue ;
+    \item sa suppression à la fermeture ou à l'expiration du flux.
+\end{enumerate}
+
+Il faut également prévoir le cas dans lequel plusieurs flux utilisent la même politique.
+
+La suppression d'une règle ne doit pas affecter les autres flux qui en dépendent.
+
+\subsection{Journalisation des actions QoS}
+
+Chaque opération doit être associée à un résultat explicite.
+
+Les états possibles peuvent être :
+
+\begin{itemize}
+    \item \texttt{pending} : action en attente ;
+    \item \texttt{applied} : politique appliquée ;
+    \item \texttt{failed} : échec de l'application ;
+    \item \texttt{removed} : règle supprimée ;
+    \item \texttt{skipped} : action non autorisée ou non nécessaire.
+\end{itemize}
+
+Cette organisation permet de distinguer une erreur de classification d'un problème de configuration réseau.
+
+% ------------------------------------------------------------
+\section{Plan détaillé de validation technique}
+% ------------------------------------------------------------
+
+\subsection{Objectifs de validation}
+
+La validation technique doit vérifier que chaque composant respecte son contrat et que l'intégration globale produit des décisions cohérentes.
+
+Elle doit couvrir quatre niveaux :
+
+\begin{enumerate}
+    \item les tests unitaires des composants ;
+    \item les tests d'intégration entre modules ;
+    \item les tests fonctionnels du cycle de classification ;
+    \item les tests de performance et de robustesse.
+\end{enumerate}
+
+\subsection{Tests unitaires}
+
+Les tests unitaires vérifient chaque composant indépendamment.
+
+\begin{table}[H]
+\centering
+\caption{Plan des tests unitaires}
+\label{tab:tests_unitaires_detail}
+\small
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Module} & \textbf{Test} & \textbf{Résultat attendu} \\
+\hline
+Gestionnaire de flux &
+Association de paquets appartenant au même flux. &
+Les paquets sont regroupés correctement. \\
+\hline
+Gestionnaire de flux &
+Expiration d'un flux inactif. &
+Le flux passe à l'état expiré. \\
+\hline
+Extracteur &
+Calcul de la taille moyenne. &
+La valeur calculée correspond aux données de référence. \\
+\hline
+Extracteur &
+Calcul des intervalles temporels. &
+Les intervalles respectent les horodatages fournis. \\
+\hline
+Prétraitement &
+Présence d'une valeur infinie. &
+L'observation est rejetée ou traitée selon la politique définie. \\
+\hline
+Classifieur &
+Prédiction sur un vecteur valide. &
+Une sortie conforme au contrat est produite. \\
+\hline
+Moteur symbolique &
+Activation d'une règle connue. &
+La règle et sa justification sont retournées. \\
+\hline
+Arbitre &
+Accord entre ML et règles. &
+La classe commune est acceptée si les seuils sont respectés. \\
+\hline
+Arbitre &
+Scores insuffisants. &
+Le flux est rejeté ou déclaré incertain. \\
+\hline
+QoS &
+Application d'une politique autorisée. &
+L'action est exécutée et journalisée. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Tests d'intégration}
+
+Les tests d'intégration vérifient la communication entre plusieurs composants.
+
+Les scénarios principaux sont :
+
+\begin{enumerate}
+    \item capture d'un paquet et création d'un flux ;
+    \item accumulation de plusieurs paquets ;
+    \item extraction et prétraitement des caractéristiques ;
+    \item transmission du vecteur au classifieur ;
+    \item transmission des métadonnées au moteur symbolique ;
+    \item réception des deux résultats par l'arbitre ;
+    \item production d'une décision ;
+    \item sélection de la politique QoS ;
+    \item enregistrement de la décision et de l'action.
+\end{enumerate}
+
+Ces tests doivent vérifier non seulement la présence des résultats, mais également la cohérence des identifiants de flux et des versions des caractéristiques.
+
+\subsection{Tests fonctionnels de l'arbitrage}
+
+Les scénarios suivants doivent être évalués :
+
+\begin{table}[H]
+\centering
+\caption{Scénarios fonctionnels de validation de l'arbitrage}
+\label{tab:tests_arbitrage}
+\small
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Scénario} & \textbf{Entrées} & \textbf{Comportement attendu} \\
+\hline
+S1 &
+ML et règles proposent VoIP avec des scores suffisants. &
+Acceptation de VoIP. \\
+\hline
+S2 &
+ML propose VoIP, règles sans résultat. &
+Décision ML seule si le seuil est respecté. \\
+\hline
+S3 &
+ML propose Web, règles proposent Vidéo avec preuves fortes. &
+Rejet ou traitement selon la politique de désaccord. \\
+\hline
+S4 &
+Scores faibles pour toutes les classes. &
+Rejet comme inconnu ou incertain. \\
+\hline
+S5 &
+Modèle ML indisponible, règle spécifique activée. &
+Repli symbolique si autorisé. \\
+\hline
+S6 &
+Les deux composants sont indisponibles. &
+Statut error, sans classe finale. \\
+\hline
+S7 &
+Vecteur contenant une valeur invalide. &
+Rejet de l'observation avant classification. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Comparaison des configurations expérimentales}
+
+Les trois configurations déjà définies dans le protocole expérimental doivent utiliser les mêmes ensembles de données et les mêmes conditions de comparaison :
+
+\begin{itemize}
+    \item IA seule ;
+    \item règles seules ;
+    \item approche hybride.
+\end{itemize}
+
+La comparaison doit être effectuée sur des partitions cohérentes afin de ne pas attribuer à l'architecture une amélioration provenant uniquement d'une différence dans les données.
+
+Lorsque cela est possible, plusieurs initialisations ou graines aléatoires doivent être utilisées pour mesurer la variabilité des résultats.
+
+\subsection{Étude d'ablation}
+
+Une étude d'ablation permet d'identifier la contribution des différents mécanismes.
+
+Les configurations suivantes peuvent être comparées :
+
+\begin{enumerate}
+    \item classifieur ML sans moteur symbolique ;
+    \item classifieur ML avec moteur symbolique ;
+    \item approche hybride sans rejet des inconnus ;
+    \item approche hybride avec rejet des inconnus ;
+    \item approche hybride avec différentes valeurs des coefficients de fusion.
+\end{enumerate}
+
+Cette étude permet de déterminer si les règles symboliques améliorent réellement la classification et si le rejet réduit les fausses acceptations des flux inconnus.
+
+\subsection{Critères d'acceptation technique}
+
+Les critères suivants peuvent être utilisés pour vérifier la conformité de l'implémentation.
+
+\begin{table}[H]
+\centering
+\caption{Critères d'acceptation de la conception technique}
+\label{tab:criteres_acceptation}
+\small
+\begin{tabularx}{\textwidth}{|X|X|}
+\hline
+\textbf{Critère} & \textbf{Condition de validation} \\
+\hline
+Modularité &
+Chaque composant peut être testé indépendamment à travers son interface. \\
+\hline
+Cohérence des données &
+Les vecteurs transmis respectent le schéma et les unités définis. \\
+\hline
+Reproductibilité &
+Les versions du modèle et du prétraitement sont identifiables. \\
+\hline
+Arbitrage &
+Les cas d'accord, de désaccord et d'indisponibilité sont distingués. \\
+\hline
+Rejet &
+Les flux insuffisamment fiables ne reçoivent pas automatiquement une classe connue. \\
+\hline
+Traçabilité &
+Une décision peut être reliée aux résultats qui l'ont produite. \\
+\hline
+QoS &
+Une politique n'est appliquée qu'après validation de la décision. \\
+\hline
+Robustesse &
+Les erreurs sont signalées et les modes dégradés sont contrôlés. \\
+\hline
+Performance &
+Les temps de traitement et les ressources consommées sont mesurables. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Les seuils quantitatifs de performance devront être définis en fonction des contraintes de l'environnement expérimental et des résultats mesurés.
+
+% ------------------------------------------------------------
+\section{Synthèse des choix techniques et des éléments à implémenter}
+% ------------------------------------------------------------
+
+La conception technique de l'agent hybride repose sur une chaîne de traitement dans laquelle chaque composant contribue à une étape précise de la classification.
+
+Le module de capture fournit les observations réseau. Le gestionnaire de flux organise ces observations en communications. L'extracteur construit les caractéristiques nécessaires à l'analyse et le prétraitement garantit leur compatibilité avec les modèles.
+
+Le classifieur ML produit une estimation statistique, tandis que le moteur symbolique exploite les connaissances explicites disponibles. L'arbitre confronte ces résultats, applique les seuils définis et décide d'accepter, de rejeter ou de différer la classification.
+
+La couche QoS exploite uniquement les décisions validées et applique les politiques autorisées. Enfin, la journalisation et les mécanismes d'explicabilité permettent de conserver les informations nécessaires à l'analyse et à la vérification du fonctionnement.
+
+Les principaux éléments à concrétiser pendant l'implémentation sont :
+
+\begin{itemize}
+    \item la définition définitive du schéma des caractéristiques ;
+    \item le choix du modèle ML effectivement déployé ;
+    \item la définition et la calibration des scores ;
+    \item la formalisation des règles symboliques ;
+    \item la détermination des seuils de rejet ;
+    \item l'implémentation des contrats d'interface ;
+    \item la définition des paramètres QoS ;
+    \item la mise en place de la traçabilité ;
+    \item la validation des performances sur un environnement contrôlé.
+\end{itemize}
+
+Cette spécification détaillée constitue une base de référence pour le développement et l'intégration des composants. Elle permet de transformer l'architecture conceptuelle en un ensemble de modules logiciels dont les responsabilités, les échanges et les comportements attendus sont explicitement définis.
+
+
 % ------------------------------------------------------------
 \section{Conclusion}
 % ------------------------------------------------------------
