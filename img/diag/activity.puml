@@ -1,0 +1,50 @@
+
+@startuml
+title Diagramme d'activité - Traitement d'un flux réseau
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam activity {
+    BackgroundColor white
+    BorderColor #34495E
+    DiamondBackgroundColor #EAF2F8
+    DiamondBorderColor #34495E
+}
+
+start
+
+:Capturer les paquets réseau;
+
+:Identifier le flux;
+
+:Observer les N premiers paquets;
+
+:Extraire les caractéristiques;
+
+fork
+    :Classifieur ML;
+    :Produire les scores de classification;
+fork again
+    :Moteur de règles symboliques;
+    :Produire les résultats des règles;
+end fork
+
+:Transmettre les résultats à l'arbitre;
+
+:Combiner les informations;
+
+if (Classification suffisamment fiable ?) then (Oui)
+    :Retenir la classe identifiée;
+    :Sélectionner la politique QoS associée;
+else (Non)
+    :Déclarer le flux comme inconnu;
+    :Sélectionner la politique QoS par défaut;
+endif
+
+:Appliquer la politique QoS;
+:Produire les informations d'explication;
+:Enregistrer la décision et les métriques;
+
+stop
+
+@enduml

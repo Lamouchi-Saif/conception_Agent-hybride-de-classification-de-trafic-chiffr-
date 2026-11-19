@@ -1028,3 +1028,31 @@ aux différents acteurs ainsi que les limites du système.
     \caption{Diagramme de cas d'utilisation de l'agent hybride}
     \label{fig:use-case}
 \end{figure}
+
+
+\section{Diagramme d'activité}
+
+Le diagramme d'activité permet de représenter le déroulement
+du traitement d'un flux réseau au sein de l'agent hybride.
+Il décrit les différentes opérations effectuées depuis
+la capture du trafic jusqu'à la prise de décision finale
+et l'application de la politique de qualité de service.
+
+Le traitement repose sur l'intervention de plusieurs
+modules complémentaires. Le classifieur d'apprentissage
+automatique et le moteur de règles symboliques produisent
+leurs résultats indépendamment. Ces résultats sont ensuite
+transmis au module d'arbitrage, qui détermine la décision
+finale.
+
+Selon le niveau de confiance obtenu, le flux est associé
+à une classe connue ou déclaré inconnu. Une politique QoS
+correspondante est alors appliquée.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]
+    {img/diag/activity.png}
+    \caption{Diagramme d'activité du traitement d'un flux}
+    \label{fig:diagramme-activite}
+\end{figure}
