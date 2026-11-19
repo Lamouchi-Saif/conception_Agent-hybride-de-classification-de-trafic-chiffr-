@@ -1,0 +1,21 @@
+\begin{thebibliography}{1}
+
+\bibitem{drapergil2016}
+G.~Draper-Gil, A.~H. Lashkari, M.~S.~I. Mamun, and A.~A. Ghorbani, ``Characterization of encrypted and vpn traffic using time-related features,'' 2016.
+
+\bibitem{rezei2019}
+S.~Rezaei and X.~Liu, ``Deep learning for encrypted traffic classification: An overview,'' {\em IEEE Communications Magazine}, vol.~57, no.~5, pp.~76--81, 2019.
+
+\bibitem{breiman2001}
+L.~Breiman, ``Random forests,'' {\em Machine Learning}, vol.~45, pp.~5--32, 2001.
+
+\bibitem{scheirer2013}
+W.~J. Scheirer, A.~de~Rezende~Rocha, A.~Sapkota, and T.~E. Boult, ``Toward open set recognition,'' in {\em IEEE Transactions on Pattern Analysis and Machine Intelligence}, vol.~35, pp.~1757--1772, 2013.
+
+\bibitem{hendrycks2017}
+D.~Hendrycks and K.~Gimpel, ``A baseline for detecting misclassified and out-of-distribution examples in neural networks,'' in {\em International Conference on Learning Representations (ICLR)}, 2017.
+
+\bibitem{garcez2020}
+A.~d'Avila Garcez and L.~C. Lamb, ``Neurosymbolic ai: The 3rd wave,'' {\em Artificial Intelligence Review}, 2020.
+
+\end{thebibliography}

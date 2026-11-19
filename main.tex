@@ -1,0 +1,298 @@
+\documentclass[12pt,a4paper]{report}
+
+% -------------------------------------------------
+% LANGUE ET ENCODAGE
+% -------------------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% Mathématiques et algorithmes
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Tableaux et mise en page
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+
+% Code source et JSON
+\usepackage{listings}
+\usepackage{upquote}
+
+% Graphiques et diagrammes
+\usepackage{tikz}
+\usetikzlibrary{
+    arrows.meta,
+    positioning,
+    shapes.geometric,
+    shapes.multipart,
+    fit,
+    backgrounds,
+    calc
+}
+
+% Liens et références
+\usepackage{url}
+
+% -------------------------------------------------
+% MISE EN PAGE
+% -------------------------------------------------
+\usepackage[a4paper,margin=2.4cm,headheight=15pt]{geometry}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\onehalfspacing
+
+% -------------------------------------------------
+% IMAGES ET FIGURES
+% -------------------------------------------------
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+
+% Chemins des images
+\graphicspath{
+    {img/}
+    {img/diag/}
+    {img/fig/}
+}
+
+% -------------------------------------------------
+% TABLEAUX
+% -------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{longtable}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% -------------------------------------------------
+% MATHEMATIQUES ET UNITES
+% -------------------------------------------------
+\usepackage{amsmath}
+\usepackage{siunitx}
+
+\sisetup{
+    locale=FR,
+    per-mode=symbol
+}
+
+% -------------------------------------------------
+% DIAGRAMMES ET GRAPHIQUES
+% -------------------------------------------------
+\usepackage{tikz}
+\usepackage{pgfplots}
+
+\pgfplotsset{compat=1.18}
+
+\usetikzlibrary{
+    arrows.meta,
+    positioning,
+    shapes.geometric,
+    fit,
+    calc
+}
+
+% -------------------------------------------------
+% COULEURS
+% -------------------------------------------------
+\usepackage{xcolor}
+
+\definecolor{bleu}{RGB}{20,55,95}
+\definecolor{griscode}{RGB}{246,247,249}
+\definecolor{bleuclaire}{RGB}{225,235,245}
+
+% -------------------------------------------------
+% CODE SOURCE
+% -------------------------------------------------
+\usepackage{listings}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{griscode},
+    frame=single,
+    breaklines=true,
+    columns=fullflexible,
+    showstringspaces=false,
+    captionpos=b
+}
+
+% -------------------------------------------------
+% LISTES
+% -------------------------------------------------
+\usepackage{enumitem}
+
+% -------------------------------------------------
+% HYPERLIENS ET METADONNEES PDF
+% -------------------------------------------------
+\usepackage[hidelinks]{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=bleu,
+    urlcolor=bleu,
+    citecolor=bleu,
+    pdftitle={Agent hybride de classification de trafic chiffre},
+    pdfauthor={LAMOUCHI Seif, Nom du deuxieme membre},
+    pdfsubject={Analyse des besoins et conception}
+}
+
+% -------------------------------------------------
+% EN-TETE ET PIED DE PAGE
+% -------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+
+\lhead{Agent hybride de classification}
+\rhead{Analyse et conception}
+\cfoot{\thepage}
+
+% -------------------------------------------------
+% Bibliographie
+% -------------------------------------------------
+\usepackage[numbers]{natbib}
+
+
+% -------------------------------------------------
+% COMMANDES PERSONNALISEES
+% -------------------------------------------------
+
+% Placeholder pour une figure ou un diagramme
+\newcommand{\figureplaceholder}[2]{
+    \begin{figure}[H]
+        \centering
+        \IfFileExists{#1}{
+            \includegraphics[width=.96\textwidth,
+            height=.58\textheight,
+            keepaspectratio]{#1}
+        }{
+            \fbox{
+                \parbox{.88\textwidth}{
+                    \centering
+                    \vspace{1cm}
+                    \textbf{Figure à ajouter :} \texttt{#1}
+                    \vspace{1cm}
+                }
+            }
+        }
+        \caption{#2}
+    \end{figure}
+}
+
+% Marqueur temporaire pour les éléments à compléter
+\newcommand{\todo}[1]{
+    \textit{\textcolor{red}{[À compléter : #1]}}
+}
+
+
+\begin{document}
+
+
+% Couleur principale
+\definecolor{bleu}{RGB}{0, 70, 140}
+
+\pagenumbering{gobble}
+
+\begin{titlepage}
+\centering
+
+% Logos institutionnels
+\noindent
+\begin{minipage}[c]{0.46\textwidth}
+    \centering
+    \IfFileExists{img/universite-de-carthage.png}
+    {\includegraphics[height=4cm,keepaspectratio]{img/universite-de-carthage.png}}
+    {\fbox{\parbox[c][2.2cm][c]{0.88\linewidth}{\centering Logo\\Université de Carthage}}}
+\end{minipage}
+\hfill
+\begin{minipage}[c]{0.46\textwidth}
+    \centering
+    \IfFileExists{img/logo-insat.jpg}
+    {\includegraphics[height=3.5cm,keepaspectratio]{img/logo-insat.jpg}}
+    {\fbox{\parbox[c][2cm][c]{0.88\linewidth}{\centering Logo\\INSAT}}}
+\end{minipage}
+
+\par\vspace{.2cm}
+
+{\large Ministère de l'Enseignement Supérieur et de la Recherche Scientifique\par}
+
+
+{\large Université de Carthage\par}
+
+
+{\large Institut National des Sciences Appliquées et de Technologie (INSAT)\par}
+
+{\color{bleu}\rule{\textwidth}{1.3pt}}
+\vspace{.1cm}
+
+{\Huge\bfseries RAPPORT DE PROJET\par}
+\vspace{.2cm}
+
+{\LARGE Analyse des besoins et conception\par}
+\vspace{.1cm}
+
+{\color{bleu}\rule{\textwidth}{1.3pt}}
+
+\vspace{.65cm}
+
+{\huge\bfseries
+Agent hybride de classification de trafic chiffré
+\par}
+
+\vspace{.25cm}
+
+{\Large
+Apprentissage, règles et rejet des flux inconnus pour la QoS
+\par}
+
+\vspace{.75cm}
+
+{\Large\textbf{Réalisé par}\par}
+\vspace{.25cm}
+
+{\Large LAMOUCHI Seif\par}
+\vspace{.08cm}
+{\Large EL JENZRI Yassine\par}
+
+\vfill
+
+\begin{tabular}{rl}
+\textbf{Matière :} & Réseaux haut débit applications\\
+\textbf{Niveau :} & Cycle ingénieur -- RT4 \\
+\textbf{Encadrant :} & Dr Kamel Karoui\\
+\textbf{Année universitaire :} & 2026--2027
+\end{tabular}
+
+\vspace{.45cm}
+
+\end{titlepage}
+
+\clearpage
+\pagenumbering{arabic}
+
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\input{analyse}
+\input{conception}
+
+\section*{Références bibliographiques}
+\addcontentsline{toc}{chapter}{Références bibliographiques}
+\bibliographystyle{ieeetr}
+\bibliography{references}
+
+\end{document}
