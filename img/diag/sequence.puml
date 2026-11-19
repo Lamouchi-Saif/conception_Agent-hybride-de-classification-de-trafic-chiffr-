@@ -1,0 +1,68 @@
+
+@startuml
+title Diagramme de séquence - Classification hybride d'un flux
+
+autonumber
+hide footbox
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam ParticipantPadding 25
+skinparam BoxPadding 10
+skinparam sequence {
+    ArrowColor #34495E
+    LifeLineBorderColor #7F8C8D
+    LifeLineBackgroundColor white
+    ParticipantBorderColor #34495E
+    ParticipantBackgroundColor #EAF2F8
+    ActorBorderColor #34495E
+    ActorBackgroundColor #FDFEFE
+}
+
+actor "Source de trafic" as Source
+participant "Module d'acquisition" as Capture
+participant "Extracteur de\ncaractéristiques" as Extracteur
+participant "Classifieur ML" as ML
+participant "Moteur de règles\nsymboliques" as Regles
+participant "Arbitre hybride" as Arbitre
+participant "Module QoS" as QoS
+participant "Équipement réseau" as Equipement
+participant "Module d'explication\net journalisation" as Explication
+
+Source -> Capture : Transmettre les paquets
+Capture -> Capture : Identifier et suivre le flux
+Capture -> Capture : Observer les N premiers paquets
+
+Capture -> Extracteur : Transmettre la fenêtre de paquets
+Extracteur -> Extracteur : Extraire les caractéristiques
+Extracteur --> Capture : Retourner le vecteur de caractéristiques
+
+par Classification par apprentissage
+    Capture -> ML : Envoyer le vecteur de caractéristiques
+    ML -> ML : Calculer les scores de classification
+    ML --> Capture : Retourner les classes et probabilités
+else Évaluation par règles
+    Capture -> Regles : Envoyer les caractéristiques disponibles
+    Regles -> Regles : Évaluer les règles symboliques
+    Regles --> Capture : Retourner les résultats des règles
+end
+
+Capture -> Arbitre : Transmettre les deux résultats
+Arbitre -> Arbitre : Fusionner les informations
+Arbitre -> Arbitre : Évaluer la fiabilité de la décision
+
+alt Classification suffisamment fiable
+    Arbitre -> QoS : Transmettre la classe reconnue
+    QoS -> QoS : Sélectionner la politique QoS associée
+else Flux non reconnu ou décision insuffisante
+    Arbitre -> QoS : Transmettre la classe « Inconnu »
+    QoS -> QoS : Sélectionner la politique QoS par défaut
+end
+
+QoS -> Equipement : Appliquer DSCP et/ou HTB
+Equipement --> QoS : Confirmer l'application
+
+Arbitre -> Explication : Transmettre la décision et les résultats
+Explication -> Explication : Générer l'explication SHAP du modèle ML
+Explication -> Explication : Enregistrer la décision et les métriques
+
+@enduml
