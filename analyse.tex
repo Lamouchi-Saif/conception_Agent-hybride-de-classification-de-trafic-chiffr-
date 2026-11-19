@@ -535,3 +535,130 @@ inconnus, le temps d'inférence et l'impact des politiques QoS. \\
 
 \end{tabularx}
 \end{table}
+
+
+\section{Besoins non fonctionnels}
+
+Les besoins non fonctionnels définissent les critères de qualité
+et les contraintes que doit respecter l'agent hybride durant
+son fonctionnement. Contrairement aux besoins fonctionnels,
+ils ne décrivent pas directement les services fournis par le
+système, mais précisent les conditions dans lesquelles ces
+services doivent être assurés.
+
+Dans le cadre de ce projet, les principaux critères concernent
+les performances, la fiabilité des décisions, la robustesse
+face aux changements de trafic, la sécurité et la reproductibilité
+des expérimentations.
+
+\subsection{Liste des besoins non fonctionnels}
+
+Les besoins non fonctionnels identifiés sont présentés dans
+le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Liste des besoins non fonctionnels}
+\label{tab:besoins-non-fonctionnels}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Critère} & \textbf{Description} \\
+\hline
+
+BNF01 & Performance &
+Le système doit effectuer la classification dans un délai
+compatible avec une prise de décision précoce. Le temps
+d'inférence par flux doit être mesuré. \\
+\hline
+
+BNF02 & Précocité &
+Le système doit pouvoir produire une décision à partir des
+N premiers paquets d'un flux, sans attendre nécessairement
+la fin de la communication. \\
+\hline
+
+BNF03 & Fiabilité &
+Les décisions de classification doivent être suffisamment
+fiables. Le mécanisme de rejet doit éviter l'affectation
+injustifiée d'une classe connue aux flux insuffisamment
+reconnus. \\
+\hline
+
+BNF04 & Robustesse &
+Le système doit être évalué face aux changements de
+distribution du trafic, aux nouvelles versions d'applications
+et aux variations de comportement des flux. \\
+\hline
+
+BNF05 & Résistance aux tentatives d'évasion &
+Le système doit être évalué face à des modifications du
+trafic, notamment le remplissage des paquets et la variation
+des délais entre les paquets. \\
+\hline
+
+BNF06 & Sécurité &
+Le traitement du trafic doit respecter la confidentialité
+des communications. Le système doit exploiter les
+caractéristiques et métadonnées disponibles sans dépendre
+de l'accès au contenu déchiffré. \\
+\hline
+
+BNF07 & Efficacité des ressources &
+Le coût de fonctionnement de l'agent doit rester maîtrisé.
+La consommation des ressources et le surcoût introduit
+par l'architecture hybride doivent être évalués. \\
+\hline
+
+BNF08 & Qualité de service &
+Les décisions de classification doivent permettre
+l'application des politiques QoS. Leur impact doit être
+évalué à travers la latence et la gigue des flux critiques. \\
+\hline
+
+BNF09 & Reproductibilité &
+Les expérimentations doivent pouvoir être reproduites
+à partir du code source, des versions des outils, des
+données utilisées et des paramètres de configuration. \\
+\hline
+
+BNF10 & Maintenabilité et modularité &
+L'architecture doit permettre de faire évoluer séparément
+les modules de classification, de règles, d'arbitrage,
+d'action et d'explication. \\
+\hline
+
+\end{tabularx}
+\end{table}
+
+\subsection{Critères d'évaluation associés}
+
+Afin de vérifier le respect de ces exigences, plusieurs
+indicateurs seront utilisés durant les expérimentations :
+
+\begin{itemize}
+    \item \textbf{Performance :} temps d'inférence par flux
+    et temps nécessaire à la prise de décision.
+
+    \item \textbf{Fiabilité :} précision, F1-score par classe
+    et taux de faux rejets des flux connus.
+
+    \item \textbf{Robustesse :} évolution des performances
+    entre les données d'entraînement et les captures de test,
+    ainsi que face aux scénarios d'évasion.
+
+    \item \textbf{Détection des inconnus :} AUROC et taux
+    de faux rejets.
+
+    \item \textbf{Qualité de service :} comparaison de la
+    latence et de la gigue des flux critiques avec et sans
+    application de la politique QoS.
+
+    \item \textbf{Efficacité :} mesure du surcoût en ressources
+    et du temps de décision introduit par les modules
+    supplémentaires de l'agent hybride.
+\end{itemize}
+
+Les valeurs cibles de ces critères seront déterminées
+à partir du protocole expérimental et des résultats obtenus,
+afin de ne pas imposer de seuils arbitraires avant les tests.
