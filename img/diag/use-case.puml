@@ -1,0 +1,40 @@
+
+@startuml
+left to right direction
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+actor "Source de trafic" as Source
+actor "Administrateur réseau" as Admin
+actor "Équipements réseau" as Equip
+actor "Environnement\nd'évaluation" as Eval
+
+rectangle "Agent hybride de classification\ndu trafic chiffré" {
+
+    usecase "Analyser et classifier\nun flux" as UC1
+
+    usecase "Détecter un flux\ninconnu" as UC2
+
+    usecase "Appliquer une\npolitique QoS" as UC3
+
+    usecase "Consulter l'explication\nd'une décision" as UC4
+
+    usecase "Évaluer les performances\nde l'agent" as UC5
+}
+
+Source --> UC1
+Source --> UC2
+
+Admin --> UC4
+
+Equip --> UC3
+
+Eval --> UC5
+
+UC1 ..> UC2 : <<extend>>
+UC1 ..> UC3 : <<include>>
+
+@enduml
