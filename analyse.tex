@@ -795,3 +795,220 @@ La stratégie exacte de fusion des résultats, les seuils
 de confiance et les priorités entre les différentes sources
 de décision seront précisés durant la conception et validés
 expérimentalement.
+
+
+\section{Scénarios d'utilisation}
+
+Les scénarios d'utilisation permettent de décrire les
+interactions entre les acteurs externes et l'agent hybride.
+Ils précisent les différentes étapes nécessaires à
+l'exécution des principales fonctionnalités du système.
+
+Dans le cadre de ce projet, les scénarios retenus couvrent
+l'analyse et la classification des flux réseau, la détection
+des flux inconnus, l'application des politiques de qualité
+de service, l'explication des décisions et l'évaluation
+des performances de l'agent.
+
+\subsection{Identification des scénarios}
+
+Les principaux scénarios d'utilisation sont présentés
+dans le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Identification des scénarios d'utilisation}
+\label{tab:scenarios-utilisation}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Scénario} & \textbf{Acteur principal} &
+\textbf{Description} \\
+\hline
+
+SU01 & Analyser et classifier un flux &
+Source de trafic &
+Analyser un flux à partir de ses premiers paquets et
+déterminer sa classe à l'aide de l'approche hybride. \\
+\hline
+
+SU02 & Détecter un flux inconnu &
+Source de trafic &
+Identifier un flux qui ne peut pas être associé de manière
+suffisamment fiable à une classe connue. \\
+\hline
+
+SU03 & Appliquer une politique QoS &
+Équipements réseau &
+Appliquer la politique de qualité de service correspondant
+à la décision finale de classification. \\
+\hline
+
+SU04 & Consulter l'explication d'une décision &
+Administrateur réseau &
+Consulter les informations permettant de comprendre
+les caractéristiques ayant contribué à une décision. \\
+\hline
+
+SU05 & Évaluer les performances de l'agent &
+Environnement d'évaluation &
+Exécuter des scénarios expérimentaux et mesurer les
+performances de classification et de qualité de service. \\
+\hline
+
+\end{tabularx}
+\end{table}
+
+
+\subsection{Description détaillée des scénarios}
+
+\subsubsection{SU01 : Analyser et classifier un flux}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Source de trafic.
+    \item \textbf{Objectif :} Identifier la catégorie d'un flux
+    réseau à partir des informations disponibles.
+    \item \textbf{Précondition :} L'agent est opérationnel
+    et le trafic réseau est accessible pour l'analyse.
+    \item \textbf{Postcondition :} Une décision de classification
+    est produite ou le flux est déclaré inconnu.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item Une source génère un flux réseau.
+    \item L'agent observe les paquets du flux.
+    \item Le module de perception extrait les caractéristiques
+    nécessaires à l'analyse.
+    \item Le classifieur produit des scores ou des probabilités
+    pour les classes connues.
+    \item Le moteur de règles analyse les métadonnées
+    disponibles et produit ses propres résultats.
+    \item Le module d'arbitrage combine les informations
+    obtenues.
+    \item L'agent produit une décision finale.
+\end{enumerate}
+
+\textbf{Scénario alternatif :}
+Si les informations disponibles sont insuffisantes pour
+identifier le flux de manière fiable, l'agent le déclare
+comme inconnu et applique le traitement correspondant.
+
+
+\subsubsection{SU02 : Détecter un flux inconnu}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Source de trafic.
+    \item \textbf{Objectif :} Éviter l'affectation injustifiée
+    d'une classe connue à un flux non reconnu.
+    \item \textbf{Précondition :} Le flux a été observé et
+    ses caractéristiques ont été extraites.
+    \item \textbf{Postcondition :} Le flux est identifié
+    comme inconnu et associé à une politique QoS par défaut.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item L'agent reçoit les résultats du classifieur
+    et du moteur de règles.
+    \item Le module d'arbitrage examine les informations
+    disponibles.
+    \item Le système constate que les conditions nécessaires
+    à une classification fiable ne sont pas satisfaites.
+    \item Le flux est déclaré inconnu.
+    \item La décision est transmise au module d'action.
+    \item Une politique QoS par défaut est appliquée.
+\end{enumerate}
+
+\textbf{Scénario alternatif :}
+Si les résultats permettent finalement d'identifier
+une classe connue de manière suffisamment fiable,
+le système retient cette classe et poursuit le traitement
+normal du flux.
+
+
+\subsubsection{SU03 : Appliquer une politique QoS}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Équipements réseau.
+    \item \textbf{Objectif :} Adapter le traitement du trafic
+    selon la classe identifiée.
+    \item \textbf{Précondition :} Une décision finale
+    de classification est disponible.
+    \item \textbf{Postcondition :} La politique QoS
+    correspondante est appliquée au flux.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item Le module d'action reçoit la décision finale
+    de l'arbitrage.
+    \item Il identifie la politique QoS associée à la classe
+    retenue.
+    \item Il configure le traitement du trafic selon
+    la politique définie.
+    \item Le marquage DSCP et la gestion des files HTB
+    sont utilisés dans l'environnement réseau prévu.
+    \item Les performances du trafic peuvent être mesurées,
+    notamment en termes de latence et de gigue.
+\end{enumerate}
+
+\textbf{Scénario alternatif :}
+Si le flux est déclaré inconnu, le module d'action
+applique la politique QoS par défaut.
+
+
+\subsubsection{SU04 : Consulter l'explication d'une décision}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Administrateur réseau.
+    \item \textbf{Objectif :} Comprendre les éléments ayant
+    contribué à une décision de classification.
+    \item \textbf{Précondition :} Une décision a été produite
+    et les informations nécessaires à son explication
+    sont disponibles.
+    \item \textbf{Postcondition :} L'administrateur dispose
+    d'informations permettant d'interpréter la décision.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item L'administrateur demande l'explication
+    d'une décision.
+    \item Le module d'explication récupère les informations
+    associées à la classification.
+    \item Le système exploite SHAP pour analyser
+    la contribution des caractéristiques utilisées
+    par le modèle.
+    \item Les résultats de l'explication sont présentés
+    à l'administrateur.
+\end{enumerate}
+
+
+\subsubsection{SU05 : Évaluer les performances de l'agent}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Environnement d'évaluation.
+    \item \textbf{Objectif :} Mesurer les performances
+    et le comportement de l'agent dans différents scénarios.
+    \item \textbf{Précondition :} L'agent et les scénarios
+    expérimentaux sont configurés.
+    \item \textbf{Postcondition :} Les indicateurs de performance
+    sont collectés et peuvent être comparés.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item L'environnement génère ou fournit les flux
+    nécessaires aux expérimentations.
+    \item L'agent traite les flux selon la configuration
+    évaluée.
+    \item Les résultats de classification sont collectés.
+    \item Les métriques de classification et de détection
+    des flux inconnus sont calculées.
+    \item Les mesures de latence, de gigue et de temps
+    d'inférence sont réalisées.
+    \item Les résultats des différentes configurations
+    sont comparés : apprentissage automatique seul,
+    méthode classique seule et approche hybride.
+\end{enumerate}
