@@ -391,3 +391,686 @@ projet. Son intérêt devra être vérifié expérimentalement en
 comparant trois configurations : apprentissage automatique seul,
 méthode classique seule et agent hybride.
 
+
+\section{Identification des acteurs}
+
+Cette section présente les différentes entités externes qui
+interagissent avec le système ou participent à son utilisation.
+L'identification des acteurs permet de mieux définir les limites
+du système ainsi que les responsabilités de chaque intervenant.
+
+\subsection{Description des acteurs}
+
+Dans le cadre de ce projet, les principaux acteurs identifiés sont :
+
+\begin{itemize}
+    \item \textbf{Administrateur réseau :}
+    Il supervise le fonctionnement de l'agent hybride, consulte
+    les résultats de classification et contrôle l'application
+    des politiques de qualité de service.
+
+    \item \textbf{Sources de trafic :}
+    Elles représentent les applications et les équipements
+    générant les flux réseau à analyser, tels que la navigation
+    Web, le streaming vidéo et les communications VoIP.
+
+    \item \textbf{Équipements réseau :}
+    Ils constituent l'environnement dans lequel les flux sont
+    transportés et sur lequel les politiques QoS sont appliquées,
+    notamment à travers le marquage DSCP et la gestion des files HTB.
+
+    \item \textbf{Environnement d'évaluation :}
+    Il permet de générer différents scénarios de trafic et de
+    mesurer les performances du système, notamment la précision
+    de classification, le temps d'inférence, la latence et la gigue.
+\end{itemize}
+
+\subsection{Synthèse des acteurs}
+
+\begin{table}[H]
+\centering
+\caption{Acteurs du système et leurs responsabilités}
+\label{tab:acteurs}
+\small
+\begin{tabularx}{\textwidth}{|p{3.2cm}|Y|}
+\hline
+\textbf{Acteur} & \textbf{Responsabilité} \\
+\hline
+Administrateur réseau &
+Superviser le système, consulter les classifications et
+contrôler les politiques QoS. \\
+\hline
+Sources de trafic &
+Générer les flux réseau destinés à être analysés par l'agent. \\
+\hline
+Équipements réseau &
+Transporter les flux et appliquer les politiques de qualité
+de service. \\
+\hline
+Environnement d'évaluation &
+Générer les scénarios expérimentaux et mesurer les performances
+du système. \\
+\hline
+\end{tabularx}
+\end{table}
+
+
+
+\section{Besoins fonctionnels}
+
+Les besoins fonctionnels représentent les différentes
+fonctionnalités que doit assurer l'agent hybride afin de répondre
+aux objectifs définis précédemment.
+
+Dans le cadre de ce projet, les fonctionnalités attendues
+concernent la capture du trafic, l'extraction des caractéristiques,
+la classification, l'arbitrage des résultats, le rejet des flux
+inconnus et l'application des politiques de qualité de service.
+
+\subsection{Liste des besoins fonctionnels}
+
+Les besoins fonctionnels identifiés sont présentés dans
+le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Liste des besoins fonctionnels}
+\label{tab:besoins-fonctionnels}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Fonctionnalité} & \textbf{Description} \\
+\hline
+
+BF01 & Capture du trafic &
+Collecter les paquets réseau à analyser sans accéder au contenu
+déchiffré des communications. \\
+\hline
+
+BF02 & Extraction des caractéristiques &
+Extraire les caractéristiques statistiques et temporelles
+des flux, notamment la taille des paquets, leur direction,
+les intervalles temporels et la durée. \\
+\hline
+
+BF03 & Classification précoce &
+Permettre l'identification d'un flux à partir de ses N premiers
+paquets, sans attendre la fin de la communication. \\
+\hline
+
+BF04 & Classification par apprentissage &
+Utiliser un modèle d'apprentissage automatique pour prédire
+la catégorie d'un flux à partir des caractéristiques extraites. \\
+\hline
+
+BF05 & Analyse symbolique &
+Appliquer des règles prédéfinies exploitant les métadonnées
+disponibles, telles que les ports, le SNI et les informations DNS. \\
+\hline
+
+BF06 & Arbitrage hybride &
+Combiner les résultats du modèle d'apprentissage et du moteur
+de règles afin de produire une décision finale. \\
+\hline
+
+BF07 & Rejet des flux inconnus &
+Identifier et rejeter les classifications insuffisamment fiables
+afin d'éviter l'affectation injustifiée d'une classe connue. \\
+\hline
+
+BF08 & Gestion de la QoS &
+Associer une politique de qualité de service à la décision finale,
+notamment à travers le marquage DSCP et la gestion des files HTB. \\
+\hline
+
+BF09 & Explicabilité &
+Fournir des explications sur les décisions du modèle en identifiant
+les caractéristiques ayant contribué aux prédictions. \\
+\hline
+
+BF10 & Évaluation des performances &
+Mesurer les performances de classification, la détection des flux
+inconnus, le temps d'inférence et l'impact des politiques QoS. \\
+\hline
+
+\end{tabularx}
+\end{table}
+
+
+\section{Besoins non fonctionnels}
+
+Les besoins non fonctionnels définissent les critères de qualité
+et les contraintes que doit respecter l'agent hybride durant
+son fonctionnement. Contrairement aux besoins fonctionnels,
+ils ne décrivent pas directement les services fournis par le
+système, mais précisent les conditions dans lesquelles ces
+services doivent être assurés.
+
+Dans le cadre de ce projet, les principaux critères concernent
+les performances, la fiabilité des décisions, la robustesse
+face aux changements de trafic, la sécurité et la reproductibilité
+des expérimentations.
+
+\subsection{Liste des besoins non fonctionnels}
+
+Les besoins non fonctionnels identifiés sont présentés dans
+le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Liste des besoins non fonctionnels}
+\label{tab:besoins-non-fonctionnels}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Critère} & \textbf{Description} \\
+\hline
+
+BNF01 & Performance &
+Le système doit effectuer la classification dans un délai
+compatible avec une prise de décision précoce. Le temps
+d'inférence par flux doit être mesuré. \\
+\hline
+
+BNF02 & Précocité &
+Le système doit pouvoir produire une décision à partir des
+N premiers paquets d'un flux, sans attendre nécessairement
+la fin de la communication. \\
+\hline
+
+BNF03 & Fiabilité &
+Les décisions de classification doivent être suffisamment
+fiables. Le mécanisme de rejet doit éviter l'affectation
+injustifiée d'une classe connue aux flux insuffisamment
+reconnus. \\
+\hline
+
+BNF04 & Robustesse &
+Le système doit être évalué face aux changements de
+distribution du trafic, aux nouvelles versions d'applications
+et aux variations de comportement des flux. \\
+\hline
+
+BNF05 & Résistance aux tentatives d'évasion &
+Le système doit être évalué face à des modifications du
+trafic, notamment le remplissage des paquets et la variation
+des délais entre les paquets. \\
+\hline
+
+BNF06 & Sécurité &
+Le traitement du trafic doit respecter la confidentialité
+des communications. Le système doit exploiter les
+caractéristiques et métadonnées disponibles sans dépendre
+de l'accès au contenu déchiffré. \\
+\hline
+
+BNF07 & Efficacité des ressources &
+Le coût de fonctionnement de l'agent doit rester maîtrisé.
+La consommation des ressources et le surcoût introduit
+par l'architecture hybride doivent être évalués. \\
+\hline
+
+BNF08 & Qualité de service &
+Les décisions de classification doivent permettre
+l'application des politiques QoS. Leur impact doit être
+évalué à travers la latence et la gigue des flux critiques. \\
+\hline
+
+BNF09 & Reproductibilité &
+Les expérimentations doivent pouvoir être reproduites
+à partir du code source, des versions des outils, des
+données utilisées et des paramètres de configuration. \\
+\hline
+
+BNF10 & Maintenabilité et modularité &
+L'architecture doit permettre de faire évoluer séparément
+les modules de classification, de règles, d'arbitrage,
+d'action et d'explication. \\
+\hline
+
+\end{tabularx}
+\end{table}
+
+\subsection{Critères d'évaluation associés}
+
+Afin de vérifier le respect de ces exigences, plusieurs
+indicateurs seront utilisés durant les expérimentations :
+
+\begin{itemize}
+    \item \textbf{Performance :} temps d'inférence par flux
+    et temps nécessaire à la prise de décision.
+
+    \item \textbf{Fiabilité :} précision, F1-score par classe
+    et taux de faux rejets des flux connus.
+
+    \item \textbf{Robustesse :} évolution des performances
+    entre les données d'entraînement et les captures de test,
+    ainsi que face aux scénarios d'évasion.
+
+    \item \textbf{Détection des inconnus :} AUROC et taux
+    de faux rejets.
+
+    \item \textbf{Qualité de service :} comparaison de la
+    latence et de la gigue des flux critiques avec et sans
+    application de la politique QoS.
+
+    \item \textbf{Efficacité :} mesure du surcoût en ressources
+    et du temps de décision introduit par les modules
+    supplémentaires de l'agent hybride.
+\end{itemize}
+
+Les valeurs cibles de ces critères seront déterminées
+à partir du protocole expérimental et des résultats obtenus,
+afin de ne pas imposer de seuils arbitraires avant les tests.
+
+
+\section{Règles de gestion}
+
+Les règles de gestion définissent les conditions et les principes
+qui encadrent le fonctionnement de l'agent hybride. Elles
+permettent de formaliser le comportement attendu des différents
+modules et de garantir la cohérence des décisions prises
+par le système.
+
+Dans le cadre de ce projet, ces règles concernent principalement
+l'analyse des flux, la classification précoce, l'exploitation
+des connaissances symboliques, l'arbitrage des résultats,
+le rejet des flux inconnus et l'application des politiques
+de qualité de service.
+
+\subsection{Liste des règles de gestion}
+
+Les principales règles de gestion identifiées sont présentées
+dans le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Règles de gestion de l'agent hybride}
+\label{tab:regles-gestion}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Règle} & \textbf{Description} \\
+\hline
+
+RG01 & Analyse des flux &
+Chaque flux réseau doit être identifié et analysé à partir
+des caractéristiques extraites des paquets observés. \\
+\hline
+
+RG02 & Classification précoce &
+La classification doit pouvoir être réalisée à partir des
+N premiers paquets du flux, sans attendre nécessairement
+la fin de la communication. \\
+\hline
+
+RG03 & Indépendance des décisions &
+Le classifieur et le moteur de règles doivent produire
+leurs propres résultats de manière indépendante avant
+leur transmission au module d'arbitrage. \\
+\hline
+
+RG04 & Exploitation des règles &
+Le moteur symbolique doit exploiter les informations réseau
+disponibles, notamment les ports, les informations SNI
+et les données DNS lorsqu'elles sont accessibles. \\
+\hline
+
+RG05 & Arbitrage hybride &
+La décision finale doit prendre en compte les résultats
+du modèle d'apprentissage et les informations fournies
+par le moteur de règles, selon la stratégie d'arbitrage
+définie. \\
+\hline
+
+RG06 & Rejet des flux inconnus &
+Lorsqu'un flux ne peut pas être associé de manière
+suffisamment fiable à une classe connue, le système doit
+pouvoir le déclarer comme inconnu. \\
+\hline
+
+RG07 & Absence d'affectation forcée &
+Un flux déclaré inconnu ne doit pas être affecté
+automatiquement à une classe connue uniquement pour
+obtenir une décision de classification. \\
+\hline
+
+RG08 & Politique QoS par défaut &
+Lorsqu'un flux est déclaré inconnu, une politique de
+qualité de service par défaut doit être appliquée,
+conformément à la configuration du système. \\
+\hline
+
+RG09 & Application de la QoS &
+Pour un flux reconnu, la classe retenue par l'arbitrage
+doit être associée à la politique QoS correspondante,
+notamment au moyen du marquage DSCP et des files HTB. \\
+\hline
+
+RG10 & Explicabilité des décisions &
+Les décisions produites par le système doivent pouvoir
+être accompagnées d'informations permettant d'expliquer
+la contribution des caractéristiques utilisées par le
+modèle, notamment à l'aide de SHAP. \\
+\hline
+
+RG11 & Évaluation des décisions &
+Les décisions et les performances de l'agent doivent
+être évaluées à travers des indicateurs de classification,
+de détection des flux inconnus et de qualité de service. \\
+\hline
+
+\end{tabularx}
+\end{table}
+
+\subsection{Principes de traitement des flux}
+
+Le traitement d'un flux réseau repose sur une succession
+d'étapes coordonnées entre les différents modules de l'agent :
+
+\begin{enumerate}
+    \item Le module de perception observe les paquets du flux
+    et extrait les caractéristiques nécessaires à son analyse.
+
+    \item Le classifieur exploite les caractéristiques extraites
+    pour produire des scores ou des probabilités associés
+    aux classes connues.
+
+    \item Le moteur de règles examine les informations réseau
+    disponibles et produit ses propres éléments de décision.
+
+    \item Le module d'arbitrage combine les résultats obtenus
+    afin de retenir une classe connue ou de déclarer le flux
+    comme inconnu.
+
+    \item Le module d'action applique la politique QoS
+    correspondant à la décision finale. Une politique
+    par défaut est utilisée pour les flux inconnus.
+
+    \item Le module d'explication fournit des informations
+    permettant de comprendre les décisions du système.
+\end{enumerate}
+
+La stratégie exacte de fusion des résultats, les seuils
+de confiance et les priorités entre les différentes sources
+de décision seront précisés durant la conception et validés
+expérimentalement.
+
+
+\section{Scénarios d'utilisation}
+
+Les scénarios d'utilisation permettent de décrire les
+interactions entre les acteurs externes et l'agent hybride.
+Ils précisent les différentes étapes nécessaires à
+l'exécution des principales fonctionnalités du système.
+
+Dans le cadre de ce projet, les scénarios retenus couvrent
+l'analyse et la classification des flux réseau, la détection
+des flux inconnus, l'application des politiques de qualité
+de service, l'explication des décisions et l'évaluation
+des performances de l'agent.
+
+\subsection{Identification des scénarios}
+
+Les principaux scénarios d'utilisation sont présentés
+dans le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Identification des scénarios d'utilisation}
+\label{tab:scenarios-utilisation}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Scénario} & \textbf{Acteur principal} &
+\textbf{Description} \\
+\hline
+
+SU01 & Analyser et classifier un flux &
+Source de trafic &
+Analyser un flux à partir de ses premiers paquets et
+déterminer sa classe à l'aide de l'approche hybride. \\
+\hline
+
+SU02 & Détecter un flux inconnu &
+Source de trafic &
+Identifier un flux qui ne peut pas être associé de manière
+suffisamment fiable à une classe connue. \\
+\hline
+
+SU03 & Appliquer une politique QoS &
+Équipements réseau &
+Appliquer la politique de qualité de service correspondant
+à la décision finale de classification. \\
+\hline
+
+SU04 & Consulter l'explication d'une décision &
+Administrateur réseau &
+Consulter les informations permettant de comprendre
+les caractéristiques ayant contribué à une décision. \\
+\hline
+
+SU05 & Évaluer les performances de l'agent &
+Environnement d'évaluation &
+Exécuter des scénarios expérimentaux et mesurer les
+performances de classification et de qualité de service. \\
+\hline
+
+\end{tabularx}
+\end{table}
+
+
+\subsection{Description détaillée des scénarios}
+
+\subsubsection{SU01 : Analyser et classifier un flux}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Source de trafic.
+    \item \textbf{Objectif :} Identifier la catégorie d'un flux
+    réseau à partir des informations disponibles.
+    \item \textbf{Précondition :} L'agent est opérationnel
+    et le trafic réseau est accessible pour l'analyse.
+    \item \textbf{Postcondition :} Une décision de classification
+    est produite ou le flux est déclaré inconnu.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item Une source génère un flux réseau.
+    \item L'agent observe les paquets du flux.
+    \item Le module de perception extrait les caractéristiques
+    nécessaires à l'analyse.
+    \item Le classifieur produit des scores ou des probabilités
+    pour les classes connues.
+    \item Le moteur de règles analyse les métadonnées
+    disponibles et produit ses propres résultats.
+    \item Le module d'arbitrage combine les informations
+    obtenues.
+    \item L'agent produit une décision finale.
+\end{enumerate}
+
+\textbf{Scénario alternatif :}
+Si les informations disponibles sont insuffisantes pour
+identifier le flux de manière fiable, l'agent le déclare
+comme inconnu et applique le traitement correspondant.
+
+
+\subsubsection{SU02 : Détecter un flux inconnu}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Source de trafic.
+    \item \textbf{Objectif :} Éviter l'affectation injustifiée
+    d'une classe connue à un flux non reconnu.
+    \item \textbf{Précondition :} Le flux a été observé et
+    ses caractéristiques ont été extraites.
+    \item \textbf{Postcondition :} Le flux est identifié
+    comme inconnu et associé à une politique QoS par défaut.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item L'agent reçoit les résultats du classifieur
+    et du moteur de règles.
+    \item Le module d'arbitrage examine les informations
+    disponibles.
+    \item Le système constate que les conditions nécessaires
+    à une classification fiable ne sont pas satisfaites.
+    \item Le flux est déclaré inconnu.
+    \item La décision est transmise au module d'action.
+    \item Une politique QoS par défaut est appliquée.
+\end{enumerate}
+
+\textbf{Scénario alternatif :}
+Si les résultats permettent finalement d'identifier
+une classe connue de manière suffisamment fiable,
+le système retient cette classe et poursuit le traitement
+normal du flux.
+
+
+\subsubsection{SU03 : Appliquer une politique QoS}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Équipements réseau.
+    \item \textbf{Objectif :} Adapter le traitement du trafic
+    selon la classe identifiée.
+    \item \textbf{Précondition :} Une décision finale
+    de classification est disponible.
+    \item \textbf{Postcondition :} La politique QoS
+    correspondante est appliquée au flux.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item Le module d'action reçoit la décision finale
+    de l'arbitrage.
+    \item Il identifie la politique QoS associée à la classe
+    retenue.
+    \item Il configure le traitement du trafic selon
+    la politique définie.
+    \item Le marquage DSCP et la gestion des files HTB
+    sont utilisés dans l'environnement réseau prévu.
+    \item Les performances du trafic peuvent être mesurées,
+    notamment en termes de latence et de gigue.
+\end{enumerate}
+
+\textbf{Scénario alternatif :}
+Si le flux est déclaré inconnu, le module d'action
+applique la politique QoS par défaut.
+
+
+\subsubsection{SU04 : Consulter l'explication d'une décision}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Administrateur réseau.
+    \item \textbf{Objectif :} Comprendre les éléments ayant
+    contribué à une décision de classification.
+    \item \textbf{Précondition :} Une décision a été produite
+    et les informations nécessaires à son explication
+    sont disponibles.
+    \item \textbf{Postcondition :} L'administrateur dispose
+    d'informations permettant d'interpréter la décision.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item L'administrateur demande l'explication
+    d'une décision.
+    \item Le module d'explication récupère les informations
+    associées à la classification.
+    \item Le système exploite SHAP pour analyser
+    la contribution des caractéristiques utilisées
+    par le modèle.
+    \item Les résultats de l'explication sont présentés
+    à l'administrateur.
+\end{enumerate}
+
+
+\subsubsection{SU05 : Évaluer les performances de l'agent}
+
+\begin{itemize}
+    \item \textbf{Acteur principal :} Environnement d'évaluation.
+    \item \textbf{Objectif :} Mesurer les performances
+    et le comportement de l'agent dans différents scénarios.
+    \item \textbf{Précondition :} L'agent et les scénarios
+    expérimentaux sont configurés.
+    \item \textbf{Postcondition :} Les indicateurs de performance
+    sont collectés et peuvent être comparés.
+\end{itemize}
+
+\textbf{Scénario nominal :}
+\begin{enumerate}
+    \item L'environnement génère ou fournit les flux
+    nécessaires aux expérimentations.
+    \item L'agent traite les flux selon la configuration
+    évaluée.
+    \item Les résultats de classification sont collectés.
+    \item Les métriques de classification et de détection
+    des flux inconnus sont calculées.
+    \item Les mesures de latence, de gigue et de temps
+    d'inférence sont réalisées.
+    \item Les résultats des différentes configurations
+    sont comparés : apprentissage automatique seul,
+    méthode classique seule et approche hybride.
+\end{enumerate}
+
+
+\subsection{Diagramme de cas d'utilisation}
+
+Le diagramme de cas d'utilisation présente les principales
+interactions entre les acteurs externes et l'agent hybride.
+Il permet de visualiser les fonctionnalités accessibles
+aux différents acteurs ainsi que les limites du système.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]
+    {img/diag/use-case.png}
+    \caption{Diagramme de cas d'utilisation de l'agent hybride}
+    \label{fig:use-case}
+\end{figure}
+
+
+\section{Diagramme d'activité}
+
+Le diagramme d'activité permet de représenter le déroulement
+du traitement d'un flux réseau au sein de l'agent hybride.
+Il décrit les différentes opérations effectuées depuis
+la capture du trafic jusqu'à la prise de décision finale
+et l'application de la politique de qualité de service.
+
+Le traitement repose sur l'intervention de plusieurs
+modules complémentaires. Le classifieur d'apprentissage
+automatique et le moteur de règles symboliques produisent
+leurs résultats indépendamment. Ces résultats sont ensuite
+transmis au module d'arbitrage, qui détermine la décision
+finale.
+
+Selon le niveau de confiance obtenu, le flux est associé
+à une classe connue ou déclaré inconnu. Une politique QoS
+correspondante est alors appliquée.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]
+    {img/diag/activity.png}
+    \caption{Diagramme d'activité du traitement d'un flux}
+    \label{fig:diagramme-activite}
+\end{figure}
+
+
+\section{Diagramme de séquence}
+
+Le diagramme de séquence suivant décrit les interactions entre les
+différents modules de l'agent hybride lors du traitement d'un flux
+réseau. Il présente les échanges nécessaires à l'extraction des
+caractéristiques, à la classification par apprentissage, à
+l'évaluation des règles symboliques, à l'arbitrage et à l'application
+de la politique QoS.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]
+    {img/diag/sequence.png}
+    \caption{Diagramme de séquence du traitement d'un flux par l'agent hybride}
+    \label{fig:diagramme-sequence}
+\end{figure}

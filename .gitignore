@@ -1,0 +1,32 @@
+# LaTeX - fichiers temporaires
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdv
+
+# Éditeurs
+.vscode/
+.idea/
+
+# Système
+.DS_Store
+Thumbs.db
+
+# Python (pour les futurs scripts du projet)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+out/
