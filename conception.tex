@@ -1,943 +1,1738 @@
+
 % ============================================================
 % CHAPITRE : CONCEPTION TECHNIQUE
 % Projet 4 : Agent hybride de classification du trafic chiffre
 % ============================================================
 
-\chapter{Conception technique du système}
+\chapter{Conception technique de l'agent hybride}
+\label{chap:conception}
 
+% ------------------------------------------------------------
 \section{Introduction}
-
-Après avoir identifié les besoins fonctionnels et non fonctionnels
-du système, cette partie présente la conception technique de la
-solution proposée. L'objectif est de définir l'architecture
-logicielle, les différents composants, leurs interactions ainsi
-que l'organisation des données nécessaires au fonctionnement
-de l'agent hybride de classification du trafic chiffré.
-
-Le système proposé repose sur une approche hybride combinant
-l'apprentissage automatique, un moteur de règles expertes et
-un mécanisme de rejet des flux inconnus. Cette combinaison
-permet de classifier le trafic réseau tout en évitant
-d'attribuer systématiquement une classe connue aux flux
-pour lesquels les informations disponibles sont insuffisantes.
-
-La conception tient également compte de l'objectif final du
-projet : l'amélioration de la gestion de la qualité de service
-(QoS) à travers l'identification des catégories de trafic
-et l'application de politiques adaptées.
-
-Les sections suivantes détaillent l'architecture générale,
-les composants logiciels, l'environnement de déploiement,
-la modélisation des données et les principaux scénarios
-d'exécution.
-
-% ------------------------------------------------------------
-\section{Objectifs et principes de conception}
 % ------------------------------------------------------------
 
-La conception de l'agent hybride repose sur plusieurs
-principes permettant de garantir une organisation claire,
-modulaire et évolutive.
+La généralisation des protocoles de communication chiffrés
+a profondément modifié les méthodes traditionnelles
+d'observation et de classification du trafic réseau.
+L'utilisation massive de HTTPS, TLS 1.3 et QUIC réduit
+la disponibilité des informations applicatives directement
+exploitables par les mécanismes classiques d'inspection.
 
-\subsection{Modularité}
+Dans ce contexte, la classification du trafic ne peut plus
+reposer exclusivement sur l'analyse du contenu des paquets.
+Elle nécessite l'exploitation de caractéristiques indirectes,
+notamment les tailles des paquets, les intervalles temporels,
+les directions de communication et les comportements
+statistiques des flux.
 
-Le système est divisé en plusieurs modules indépendants.
-Chaque module possède une responsabilité précise et
-communique avec les autres à travers des interfaces définies.
-
-Cette organisation facilite la maintenance, les tests
-unitaires et l'évolution indépendante des différentes
-fonctionnalités.
-
-\subsection{Approche hybride}
-
-La classification repose sur la combinaison de deux
-mécanismes complémentaires :
+La conception proposée dans ce projet repose sur une
+architecture hybride associant trois mécanismes
+complémentaires :
 
 \begin{itemize}
-    \item \textbf{Apprentissage automatique :} un modèle
-    supervisé analyse les caractéristiques statistiques
-    des flux et propose une classe de trafic.
-
-    \item \textbf{Règles expertes :} un moteur de règles
-    applique des conditions prédéfinies afin de compléter
-    ou de contrôler les prédictions du modèle.
+    \item un module d'apprentissage automatique capable
+    d'identifier des comportements à partir de données
+    d'entraînement ;
+    \item un moteur de règles symboliques permettant
+    d'exploiter des connaissances explicites et des
+    métadonnées disponibles ;
+    \item un mécanisme d'arbitrage intégrant un dispositif
+    de rejet des flux inconnus ou insuffisamment fiables.
 \end{itemize}
 
-Un mécanisme de fusion permet ensuite de déterminer
-la décision finale selon une politique d'arbitrage
-à définir et à évaluer expérimentalement.
+La décision finale est ensuite exploitée par une couche
+de gestion de la qualité de service afin d'adapter
+le traitement réseau aux différentes catégories de trafic.
 
-\subsection{Reconnaissance des flux inconnus}
+Ce chapitre présente les choix architecturaux, les
+mécanismes algorithmiques, les structures de données,
+les interfaces logicielles et les stratégies d'évaluation
+retenues pour la conception de cette solution.
 
-Le système ne doit pas obligatoirement attribuer une classe
-connue à chaque flux. Un mécanisme de rejet examine
-la confiance associée à la décision.
+% ------------------------------------------------------------
+\section{Fondements scientifiques et démarche de conception}
+% ------------------------------------------------------------
 
-Lorsqu'une prédiction ne satisfait pas les conditions
-de confiance définies, le flux est considéré comme
-inconnu pour la classification fine et peut être orienté
-vers une politique QoS par défaut, notamment Best Effort.
+\subsection{Évolution des méthodes de classification}
 
-\subsection{Séparation entre classification et QoS}
+La classification du trafic réseau a historiquement
+été réalisée à partir de plusieurs familles de méthodes.
 
-La classification et l'application de la QoS constituent
-deux responsabilités distinctes.
+\paragraph{Classification par ports}
 
-Le moteur de classification détermine la catégorie du trafic,
-tandis que le gestionnaire QoS traduit cette décision
-en une politique réseau applicable.
+Cette approche associe les numéros de ports aux applications
+ou aux protocoles correspondants. Elle est simple à mettre
+en oeuvre, mais devient peu fiable lorsque les applications
+utilisent des ports dynamiques, partagés ou des mécanismes
+de tunneling.
 
-Cette séparation permet de modifier les politiques QoS
-sans devoir modifier directement le modèle d'apprentissage.
+\paragraph{Inspection approfondie des paquets}
+
+La méthode DPI (\textit{Deep Packet Inspection}) consiste
+à examiner les informations contenues dans les paquets
+afin d'identifier les protocoles et les applications.
+
+Cependant, le chiffrement limite fortement l'accès au
+contenu applicatif. Cette limitation est particulièrement
+importante avec les communications modernes utilisant
+TLS 1.3 et QUIC.
+
+\paragraph{Classification statistique}
+
+Les méthodes statistiques exploitent les propriétés
+observables des communications sans nécessiter
+l'accès au contenu en clair.
+
+Les caractéristiques utilisées peuvent comprendre
+les tailles des paquets, leur fréquence, les durées
+de communication et les distributions temporelles.
+
+\paragraph{Apprentissage automatique}
+
+Les modèles ML apprennent des relations entre les
+caractéristiques extraites et les catégories de trafic
+présentes dans les données d'entraînement.
+
+Cette approche permet d'identifier des comportements
+complexes, mais elle dépend de la représentativité
+des données et peut produire des classifications
+incorrectes lorsqu'un flux appartient à une catégorie
+non représentée pendant l'apprentissage.
+
+\subsection{Justification de l'approche hybride}
+
+L'approche hybride est retenue afin de combiner
+les avantages de l'apprentissage automatique et
+des règles symboliques.
+
+Le modèle ML fournit une capacité de généralisation
+à partir des caractéristiques statistiques, tandis
+que les règles apportent des connaissances explicites
+et permettent d'intégrer des indices contextuels.
+
+Le moteur d'arbitrage assure la coordination entre
+ces deux sources d'information.
+
+Cette architecture poursuit quatre objectifs :
+
+\begin{enumerate}
+    \item améliorer la robustesse de la classification ;
+    \item exploiter les connaissances explicites disponibles ;
+    \item identifier les situations de désaccord ou d'incertitude ;
+    \item éviter les classifications forcées des flux inconnus.
+\end{enumerate}
+
+La conception s'inscrit dans une logique de classification
+en environnement ouvert, dans lequel l'ensemble des flux
+observés en exploitation peut dépasser les catégories
+connues lors de l'entraînement.
+
+% ------------------------------------------------------------
+\section{Hypothèses et périmètre technique}
+% ------------------------------------------------------------
+
+La solution est conçue autour des hypothèses suivantes :
+
+\begin{itemize}
+    \item Les communications peuvent être chiffrées.
+    \item Le contenu applicatif n'est pas déchiffré.
+    \item Les caractéristiques observables des paquets
+    restent exploitables.
+    \item La classification doit intervenir après
+    l'observation d'une fenêtre limitée de paquets.
+    \item Les catégories inconnues doivent pouvoir être
+    explicitement rejetées.
+    \item La politique QoS doit être appliquée à partir
+    d'une décision suffisamment fiable.
+\end{itemize}
+
+La notion de flux est définie à partir d'un identifiant
+de communication comprenant notamment le protocole,
+les adresses et les ports source et destination lorsqu'ils
+sont disponibles.
+
+Pour les protocoles TCP et UDP, le système peut utiliser
+une représentation bidirectionnelle afin de prendre en
+compte les échanges dans les deux sens.
+
+Le traitement des protocoles multiplexés, notamment QUIC,
+nécessite une attention particulière : une connexion
+de transport ne correspond pas nécessairement à une
+seule activité applicative.
+
+La conception doit donc distinguer l'identification
+d'un flux réseau et l'identification d'une application.
 
 % ------------------------------------------------------------
 \section{Architecture générale du système}
 % ------------------------------------------------------------
 
-\subsection{Présentation de l'architecture}
+\subsection{Vue architecturale}
 
-L'architecture proposée adopte une organisation en couches
-afin de séparer les opérations de capture, de traitement,
-de classification, de décision et d'application de la QoS.
+Le système adopte une architecture modulaire organisée
+en couches fonctionnelles.
 
-Le fonctionnement général suit une chaîne de traitement
-commençant par la réception des paquets réseau et se terminant
-par l'application d'une politique adaptée au flux.
+La couche d'acquisition est responsable de l'observation
+du trafic réseau. La couche de traitement transforme
+les paquets en représentations numériques. La couche
+d'intelligence effectue les prédictions et l'analyse
+symbolique. La couche décisionnelle fusionne les résultats
+et gère les situations d'incertitude. Enfin, la couche
+d'action applique les politiques QoS.
 
-Les principales couches sont les suivantes :
-
-\begin{enumerate}
-    \item \textbf{Couche d'acquisition :} elle assure la capture
-    des paquets et l'identification des flux réseau.
-
-    \item \textbf{Couche d'extraction et de préparation :}
-    elle calcule les caractéristiques statistiques et prépare
-    les données destinées aux modules de classification.
-
-    \item \textbf{Couche de classification hybride :}
-    elle regroupe le modèle d'apprentissage automatique,
-    le moteur de règles et le mécanisme de fusion.
-
-    \item \textbf{Couche de détection des flux inconnus :}
-    elle évalue la confiance de la décision et détermine
-    si le flux peut être classifié ou doit être rejeté.
-
-    \item \textbf{Couche QoS :} elle associe une classe
-    acceptée à une politique de qualité de service et
-    assure son application.
-
-    \item \textbf{Couche de stockage et de supervision :}
-    elle conserve les informations utiles et permet
-    le suivi des décisions du système.
-\end{enumerate}
-
-\subsection{Schéma de l'architecture globale}
-
-La figure suivante présente les différentes couches
-fonctionnelles et les principaux échanges entre elles.
-
-% >>> IMAGE 1 : architecture_globale.png
 \begin{figure}[H]
-    \centering
-    \includegraphics[
-        width=\textwidth,
-        height=0.88\textheight,
-        keepaspectratio
-    ]{img/diag/architecture_globale.png}
-    \caption{Architecture globale de l'agent hybride de classification du trafic chiffré}
-    \label{fig:architecture-globale}
+\centering
+\IfFileExists{img/diag/architecture_globale.png}{
+\includegraphics[width=0.95\textwidth]
+{img/diag/architecture_globale.png}
+}{
+\fbox{\parbox{0.85\textwidth}{
+\centering
+\vspace{1cm}
+EMPLACEMENT : architecture globale\\
+Fichier : img/diag/architecture\_globale.png
+\vspace{1cm}
+}}
+}
+\caption{Architecture globale proposée pour l'agent hybride}
+\label{fig:architecture_globale}
 \end{figure}
 
-\subsection{Description du flux de traitement}
-
-Le fonctionnement de l'architecture peut être décrit
-par les étapes suivantes :
-
-\begin{enumerate}
-    \item Les paquets sont capturés à partir de l'interface
-    réseau.
-
-    \item Les paquets sont regroupés en flux à partir
-    de leurs informations d'identification, notamment
-    les adresses IP, les ports et le protocole.
-
-    \item Les caractéristiques statistiques sont extraites
-    afin de représenter le comportement du flux.
-
-    \item Les données sont préparées pour être transmises
-    au modèle d'apprentissage et au moteur de règles.
-
-    \item Les deux mécanismes produisent leurs résultats
-    respectifs.
-
-    \item Le module de fusion combine les résultats selon
-    la politique d'arbitrage définie.
-
-    \item Le mécanisme de rejet vérifie si la décision
-    présente un niveau de confiance suffisant.
-
-    \item Le gestionnaire QoS associe la décision acceptée
-    à une politique adaptée.
-
-    \item Les informations relatives au traitement sont
-    enregistrées pour permettre leur analyse ultérieure.
-\end{enumerate}
-
-% ------------------------------------------------------------
-\section{Découpage modulaire et composants logiciels}
-% ------------------------------------------------------------
-
-\subsection{Présentation des modules}
-
-Afin de faciliter le développement et la maintenance,
-l'agent hybride est organisé en plusieurs composants
-logiciels.
-
-\subsubsection{Module de capture des paquets}
-
-Ce module assure l'acquisition du trafic réseau.
-Il permet de récupérer les paquets circulant sur
-une interface réseau à l'aide d'un outil de capture
-tel que TShark ou d'une bibliothèque telle que Scapy.
-
-Les paquets capturés constituent les données d'entrée
-du système.
-
-\subsubsection{Module de gestion des flux}
-
-Ce module regroupe les paquets appartenant à une même
-communication logique.
-
-L'identification peut notamment s'appuyer sur le
-quintuplet suivant :
-
-\begin{itemize}
-    \item Adresse IP source ;
-    \item Adresse IP destination ;
-    \item Port source ;
-    \item Port destination ;
-    \item Protocole de transport.
-\end{itemize}
-
-Ce mécanisme permet de distinguer les différentes
-communications observées sur le réseau.
-
-\subsubsection{Module d'extraction des caractéristiques}
-
-Ce module transforme les informations issues des paquets
-en caractéristiques numériques exploitables par les
-algorithmes d'apprentissage automatique.
-
-Les caractéristiques envisageables comprennent :
-
-\begin{itemize}
-    \item Le nombre de paquets observés ;
-    \item La taille moyenne des paquets ;
-    \item La taille minimale et maximale ;
-    \item La durée du flux ;
-    \item Le débit estimé ;
-    \item Les intervalles entre les arrivées de paquets
-    (Inter-Arrival Time ou IAT).
-\end{itemize}
-
-L'utilisation des caractéristiques statistiques permet
-d'étudier le comportement du trafic sans dépendre
-directement du contenu applicatif chiffré.
-
-\subsubsection{Module de prétraitement}
-
-Avant leur utilisation par le modèle, les caractéristiques
-font l'objet d'une préparation.
-
-Cette étape peut inclure :
-
-\begin{itemize}
-    \item Le traitement des valeurs manquantes ;
-    \item La suppression ou le traitement des valeurs
-    aberrantes ;
-    \item La normalisation des variables lorsque cela
-    est nécessaire ;
-    \item L'encodage des variables catégorielles ;
-    \item La vérification de la compatibilité des données
-    avec le modèle entraîné.
-\end{itemize}
-
-Le même processus de préparation doit être appliqué
-aux données d'entraînement et aux données utilisées
-lors de la classification.
-
-\subsubsection{Module d'apprentissage automatique}
-
-Ce module utilise un modèle supervisé afin d'identifier
-la catégorie de trafic correspondant aux caractéristiques
-du flux.
-
-Un modèle de type Random Forest constitue une possibilité
-adaptée à l'expérimentation, notamment pour exploiter
-des caractéristiques numériques et étudier l'importance
-des variables.
-
-Le modèle fournit une classe prédite et, selon son
-implémentation et sa configuration, des scores associés
-aux différentes classes.
-
-\subsubsection{Moteur de règles expertes}
-
-Le moteur de règles applique un ensemble de conditions
-définies à l'avance.
-
-Ces règles peuvent être utilisées pour identifier
-certains comportements particuliers, compléter les
-prédictions du modèle ou imposer des décisions dans
-des situations spécifiques.
-
-Chaque règle peut être caractérisée par :
-
-\begin{itemize}
-    \item Un identifiant ;
-    \item Une condition ;
-    \item Une classe ou une action associée ;
-    \item Un niveau de priorité ;
-    \item Un état d'activation.
-\end{itemize}
-
-\subsubsection{Module de fusion et d'arbitrage}
-
-Ce module reçoit les résultats du modèle d'apprentissage
-et ceux du moteur de règles.
-
-Il applique une stratégie d'arbitrage permettant de
-produire une décision candidate.
-
-La stratégie peut notamment prendre en compte la
-confiance du modèle, la priorité des règles et la
-cohérence entre les résultats.
-
-En cas de désaccord, le comportement doit être
-explicitement défini afin d'éviter les décisions
-arbitraires.
-
-\subsubsection{Module de détection des flux inconnus}
-
-Ce module examine le niveau de confiance associé
-à la décision candidate.
-
-Un seuil de rejet configurable permet de distinguer
-les décisions suffisamment fiables des décisions
-incertaines.
-
-Si la confiance est inférieure au seuil retenu,
-le flux est considéré comme inconnu pour la
-classification fine.
-
-\subsubsection{Module de gestion de la QoS}
-
-Le gestionnaire QoS transforme la décision finale
-en une politique de traitement réseau.
-
-Il peut notamment associer les catégories reconnues
-à des valeurs DSCP et appliquer les règles de
-traitement correspondantes à l'aide des outils
-du système d'exploitation.
-
-Les flux inconnus peuvent être orientés vers une
-politique par défaut de type Best Effort.
-
-\subsubsection{Module de stockage et de supervision}
-
-Ce module conserve les informations utiles au suivi
-du système :
-
-\begin{itemize}
-    \item Les informations d'identification des flux ;
-    \item Les caractéristiques extraites ;
-    \item Les prédictions du modèle ;
-    \item Les décisions du moteur hybride ;
-    \item Les résultats du mécanisme de rejet ;
-    \item Les politiques QoS appliquées ;
-    \item Les événements et erreurs.
-\end{itemize}
-
-Ces informations permettent de suivre le fonctionnement
-de l'agent et de faciliter l'évaluation expérimentale.
-
-\subsection{Diagramme de composants}
-
-Le diagramme suivant représente l'organisation des
-composants logiciels ainsi que leurs principales
-relations et dépendances.
-
-% >>> IMAGE 2 : diagramme_composants.png
-\begin{figure}[H]
-    \centering
-    \includegraphics[
-        width=\textwidth,
-        height=0.88\textheight,
-        keepaspectratio
-    ]{img/diag/diagramme_composants.png}
-    \caption{Diagramme UML des composants logiciels de l'agent hybride}
-    \label{fig:composants}
-\end{figure}
-
-\subsection{Relations entre les composants}
-
-Les composants communiquent à travers des échanges
-de données structurés.
-
-Le module de capture transmet les paquets au gestionnaire
-de flux. Celui-ci transmet les informations nécessaires
-à l'extraction des caractéristiques.
-
-Après prétraitement, les données sont communiquées
-simultanément au modèle d'apprentissage et au moteur
-de règles.
-
-Les résultats sont ensuite transmis au module de
-fusion, puis au mécanisme de rejet et au gestionnaire
-QoS.
-
-Cette organisation permet de séparer les responsabilités
-et de limiter les dépendances directes entre les
-composants.
-
-% ------------------------------------------------------------
-\section{Architecture physique et environnement de déploiement}
-% ------------------------------------------------------------
-
-\subsection{Environnement de déploiement}
-
-La solution est envisagée dans un environnement basé
-sur Linux, permettant l'accès aux interfaces réseau,
-aux outils de capture et aux mécanismes de gestion
-de la qualité de service.
-
-L'organisation technique proposée comprend :
-
-\begin{itemize}
-    \item Un environnement d'exécution Python pour
-    les modules de traitement et de classification ;
-
-    \item Un outil de capture tel que TShark ou Scapy ;
-
-    \item Un environnement de préparation et
-    d'exploitation des données ;
-
-    \item Un modèle d'apprentissage automatique
-    entraîné et sauvegardé ;
-
-    \item Un moteur de règles configurables ;
-
-    \item Les outils Linux de gestion QoS, notamment
-    \texttt{tc} et \texttt{iproute2} ;
-
-    \item Un mécanisme de stockage et de journalisation.
-\end{itemize}
-
-Mininet peut également être utilisé comme environnement
-de test pour générer des scénarios de trafic et étudier
-le comportement de la solution dans un réseau virtuel.
-
-\subsection{Diagramme de déploiement}
-
-Le diagramme de déploiement présente les principaux
-éléments matériels et logiciels nécessaires à
-l'exécution de l'agent hybride.
-
-% >>> IMAGE 3 : diagramme_deploiement.png
-\begin{figure}[H]
-    \centering
-    \includegraphics[
-        width=\textwidth,
-        height=0.88\textheight,
-        keepaspectratio
-    ]{img/diag/diagramme_deploiement.png}
-    \caption{Diagramme UML de déploiement de l'agent hybride}
-    \label{fig:deploiement}
-\end{figure}
-
-\subsection{Description du déploiement}
-
-La logique de classification est exécutée dans
-l'environnement Python.
-
-Les outils de capture assurent l'acquisition du trafic,
-tandis que les modules logiciels prennent en charge
-l'identification des flux et le calcul des caractéristiques.
-
-Le modèle et le moteur de règles sont utilisés pour
-produire la décision hybride.
-
-Le gestionnaire QoS communique avec les mécanismes
-du système Linux afin de traduire les décisions
-en actions de traitement réseau.
-
-L'environnement Mininet permet de tester le système
-dans un contexte contrôlé, sans nécessiter
-obligatoirement un réseau physique complexe.
-
-% ------------------------------------------------------------
-\section{Modélisation des données}
-% ------------------------------------------------------------
-
-\subsection{Objectif de la modélisation}
-
-La modélisation des données permet de définir les
-informations nécessaires au fonctionnement de
-l'agent hybride et à la conservation de son historique.
-
-Les principales données concernent les flux observés,
-leurs caractéristiques, les prédictions obtenues,
-les décisions finales et les politiques QoS appliquées.
-
-La structure proposée vise à assurer la traçabilité
-entre un flux réseau et les décisions prises à son sujet.
-
-\subsection{Entités principales}
-
-Le modèle conceptuel proposé comprend les entités
-suivantes :
-
-\begin{itemize}
-
-    \item \textbf{Flux :} représente une communication
-    réseau identifiée par ses adresses, ses ports,
-    son protocole et ses informations temporelles.
-
-    \item \textbf{Caractéristique :} regroupe les
-    mesures statistiques extraites du flux.
-
-    \item \textbf{Prédiction :} conserve le résultat
-    produit par le modèle d'apprentissage, notamment
-    la classe proposée et le score associé.
-
-    \item \textbf{Règle :} représente une condition
-    experte définie dans le moteur de règles.
-
-    \item \textbf{Décision :} conserve la décision
-    finale issue du mécanisme hybride, y compris
-    le statut de rejet éventuel.
-
-    \item \textbf{Politique QoS :} décrit les paramètres
-    associés à une classe de trafic, notamment
-    le marquage DSCP et les priorités.
-
-    \item \textbf{Application QoS :} conserve
-    les informations relatives à l'application
-    d'une politique à un flux.
-\end{itemize}
-
-\subsection{Modèle conceptuel des données}
-
-La figure suivante présente les principales entités
-du système, leurs attributs et les relations
-entre elles.
-
-% >>> IMAGE 4 : modele_donnees.png
-\begin{figure}[H]
-    \centering
-    \includegraphics[
-        width=1.05\textwidth,
-        height=0.88\textheight,
-        keepaspectratio
-    ]{img/diag/modele_donnees.png}
-    \caption{Modèle conceptuel des données de l'agent hybride}
-    \label{fig:mcd}
-\end{figure}
-
-\subsection{Description des relations}
-
-Les relations entre les entités peuvent être décrites
-de la manière suivante :
-
-\begin{itemize}
-
-    \item Un flux peut posséder plusieurs enregistrements
-    de caractéristiques, selon la stratégie de
-    conservation retenue.
-
-    \item Un flux peut faire l'objet de plusieurs
-    prédictions au cours de son traitement.
-
-    \item Un flux peut être associé à une ou plusieurs
-    décisions enregistrées.
-
-    \item Une prédiction peut contribuer à une décision
-    finale.
-
-    \item Une règle peut intervenir dans la production
-    d'une décision.
-
-    \item Une décision peut déclencher l'application
-    d'une politique QoS.
-
-    \item Une politique QoS peut être utilisée pour
-    plusieurs applications sur différents flux.
-\end{itemize}
-
-Ce modèle constitue une proposition conceptuelle.
-Sa traduction en tables relationnelles dépendra
-du choix définitif du système de stockage et
-des besoins de persistance retenus.
-
-% ------------------------------------------------------------
-\section{Scénarios de fonctionnement}
-% ------------------------------------------------------------
-
-Cette section décrit les principaux scénarios
-d'interaction entre les composants de l'agent hybride.
-
-Deux situations sont particulièrement importantes :
-la classification normale d'un flux reconnu et
-le rejet d'un flux dont la classification n'est
-pas suffisamment fiable.
-
-\subsection{Scénario nominal : classification d'un flux connu}
-
-\subsubsection{Description du scénario}
-
-Lorsqu'un nouveau flux réseau est observé,
-le module de capture récupère les paquets correspondants.
-
-Le gestionnaire de flux identifie la communication
-à partir de ses informations réseau.
-
-Le module d'extraction calcule ensuite les
-caractéristiques statistiques nécessaires.
-
-Après prétraitement, le vecteur de caractéristiques
-est transmis au modèle d'apprentissage et au
-moteur de règles.
-
-Le modèle propose une classe accompagnée de ses
-scores, tandis que le moteur de règles fournit
-une décision fondée sur les conditions configurées.
-
-Le module de fusion combine ces résultats afin
-de produire une décision candidate.
-
-Si cette décision satisfait les conditions de
-confiance et de validation, elle est transmise
-au gestionnaire QoS.
-
-Celui-ci sélectionne la politique correspondante
-et peut procéder au marquage DSCP et à l'application
-des mécanismes QoS.
-
-Enfin, les informations relatives à la décision
-sont enregistrées.
-
-\subsubsection{Diagramme de séquence du scénario nominal}
-
-Le diagramme ci-dessous illustre les interactions
-entre les différents composants lors du traitement
-d'un flux reconnu.
-
-% >>> IMAGE 5 : sequence_classification.png
-\begin{figure}[H]
-    \centering
-    \includegraphics[
-        width=1.05\textwidth,
-        height=0.90\textheight,
-        keepaspectratio
-    ]{img/diag/sequence_classification.png}
-    \caption{Diagramme de séquence de la classification d'un flux connu}
-    \label{fig:sequence-classification}
-\end{figure}
-
-\subsection{Scénario alternatif : rejet d'un flux inconnu}
-
-\subsubsection{Description du scénario}
-
-Dans certains cas, les caractéristiques observées
-ne permettent pas d'identifier un flux avec un
-niveau de confiance suffisant.
-
-Cette situation peut apparaître lorsque le flux
-présente un comportement différent de ceux observés
-pendant l'entraînement ou lorsque les informations
-disponibles sont insuffisantes.
-
-Après réception des résultats du modèle et du
-moteur de règles, le mécanisme de fusion transmet
-la décision candidate au détecteur de flux inconnus.
-
-Ce dernier compare le niveau de confiance au seuil
-de rejet configuré.
-
-Si les conditions de confiance ne sont pas satisfaites,
-le flux est marqué comme inconnu pour la classification
-fine.
-
-Le gestionnaire QoS applique alors une politique
-par défaut, telle que Best Effort, selon les règles
-définies dans le système.
-
-La décision de rejet et l'action QoS correspondante
-sont ensuite enregistrées.
-
-Il est important de préciser que le rejet concerne
-la classification du flux et ne signifie pas
-nécessairement le blocage de son trafic.
-
-\subsubsection{Diagramme de séquence du scénario de rejet}
-
-Le diagramme suivant présente le comportement
-du système lorsqu'une décision ne satisfait pas
-le seuil de confiance retenu.
-
-% >>> IMAGE 6 : sequence_rejet.png
-\begin{figure}[H]
-    \centering
-    \includegraphics[
-        width=1.05\textwidth,
-        height=0.90\textheight,
-        keepaspectratio
-    ]{img/diag/sequence_rejet.png}
-    \caption{Diagramme de séquence du rejet d'un flux inconnu et de son traitement en Best Effort}
-    \label{fig:sequence-rejet}
-\end{figure}
-
-% ------------------------------------------------------------
-\section{Interfaces et échanges entre les modules}
-% ------------------------------------------------------------
-
-\subsection{Principe général}
-
-Les composants de l'agent hybride échangent des
-informations structurées afin de garantir la
-continuité du traitement.
-
-Chaque module reçoit des données en entrée,
-effectue son traitement et transmet un résultat
-au module suivant.
-
-Les échanges doivent respecter des formats
-cohérents afin de faciliter l'intégration
-et les tests.
-
-\subsection{Principaux échanges}
-
-Le tableau suivant présente les principaux
-échanges logiques entre les composants.
+\subsection{Organisation en couches}
 
 \begin{table}[H]
 \centering
-\caption{Principaux échanges entre les modules}
-\label{tab:interfaces-modules}
-\small
+\caption{Organisation fonctionnelle de l'architecture}
+\label{tab:couches}
 \begin{tabularx}{\textwidth}{|l|X|X|}
 \hline
-\textbf{Module source} &
-\textbf{Module destinataire} &
-\textbf{Données échangées} \\
+\textbf{Couche} & \textbf{Composants} &
+\textbf{Responsabilités} \\
 \hline
-
-Capture &
-Gestionnaire de flux &
-Paquets capturés et métadonnées réseau \\
+Acquisition &
+Capture, gestion des flux &
+Observer et identifier le trafic. \\
 \hline
-
-Gestionnaire de flux &
-Extracteur de caractéristiques &
-Informations d'identification du flux et paquets \\
+Traitement &
+Extraction, normalisation &
+Produire les caractéristiques exploitables. \\
 \hline
-
-Extracteur &
-Prétraitement &
-Vecteur de caractéristiques brutes \\
+Intelligence &
+ML, règles symboliques &
+Produire des prédictions et des scores. \\
 \hline
-
-Prétraitement &
-Classificateur ML &
-Vecteur numérique préparé \\
+Décision &
+Arbitrage, rejet &
+Fusionner les résultats et décider. \\
 \hline
-
-Prétraitement &
-Moteur de règles &
-Informations utiles à l'évaluation des règles \\
+Action &
+QoS, journalisation &
+Appliquer les politiques et enregistrer les décisions. \\
 \hline
-
-Classificateur ML &
-Fusion &
-Classe proposée et scores du modèle \\
+Explicabilité &
+SHAP, justification symbolique &
+Expliquer les résultats obtenus. \\
 \hline
-
-Moteur de règles &
-Fusion &
-Règles correspondantes et décisions proposées \\
-\hline
-
-Fusion &
-Détecteur de rejet &
-Décision candidate et informations de confiance \\
-\hline
-
-Détecteur de rejet &
-Gestionnaire QoS &
-Classe acceptée ou statut inconnu \\
-\hline
-
-Gestionnaire QoS &
-Contrôleur réseau &
-Politique QoS et paramètres d'application \\
-\hline
-
 \end{tabularx}
 \end{table}
 
-\subsection{Format logique d'une décision}
+\subsection{Architecture modulaire}
 
-Une décision finale peut être représentée
-par une structure logique contenant les champs
-suivants :
+La séparation des responsabilités permet de limiter
+les dépendances entre les composants.
+
+Chaque module possède une interface définie et communique
+avec les autres composants au moyen de structures
+de données normalisées.
+
+Cette organisation présente plusieurs avantages :
 
 \begin{itemize}
-    \item Identifiant du flux ;
-    \item Classe proposée par le modèle ;
-    \item Classe proposée par le moteur de règles ;
-    \item Classe finale retenue ;
-    \item Score ou niveau de confiance ;
-    \item Origine de la décision ;
-    \item Statut de rejet ;
-    \item Politique QoS associée.
+    \item possibilité de remplacer un modèle ML sans
+    modifier le moteur de règles ;
+    \item possibilité d'ajouter de nouvelles règles
+    indépendamment de l'entraînement ;
+    \item possibilité de comparer plusieurs stratégies
+    d'arbitrage ;
+    \item facilité de test et de maintenance ;
+    \item possibilité de désactiver temporairement
+    certains composants en environnement expérimental.
 \end{itemize}
 
-Cette structure facilite la communication entre
-les modules et la traçabilité des décisions.
+\begin{figure}[H]
+\centering
+\IfFileExists{img/diag/architecture_modulaire.png}{
+\includegraphics[width=\textwidth]
+{img/diag/architecture_modulaire.png}
+}{
+\fbox{\parbox{0.85\textwidth}{
+\centering
+\vspace{1cm}
+EMPLACEMENT : architecture modulaire\\
+Fichier : img/diag/architecture_modulaire.png
+\vspace{1cm}
+}}
+}
+\caption{Décomposition modulaire du système}
+\label{fig:architecture_modulaire}
+\end{figure}
+
+% ------------------------------------------------------------
+\section{Conception du module de capture et d'extraction}
+% ------------------------------------------------------------
+
+\subsection{Capture du trafic}
+
+Le module de capture constitue le point d'entrée
+de l'agent.
+
+Il assure l'observation des paquets circulant sur
+une interface réseau déterminée.
+
+TShark peut être utilisé pour effectuer cette opération
+et fournir les informations nécessaires au traitement
+ultérieur.
+
+Le système ne cherche pas à récupérer le contenu
+déchiffré des communications. Il exploite les informations
+de transport et les caractéristiques observables.
+
+Les principales opérations sont :
+
+\begin{enumerate}
+    \item initialisation de l'interface de capture ;
+    \item réception des paquets ;
+    \item extraction des champs nécessaires ;
+    \item identification de la communication ;
+    \item transmission des observations au gestionnaire
+    de flux.
+\end{enumerate}
+
+\subsection{Identification et gestion des flux}
+
+Un flux est identifié par un ensemble de paramètres
+permettant de regrouper les paquets appartenant
+à une même communication.
+
+Pour TCP et UDP, une représentation simplifiée
+peut être définie par :
+
+\[
+F=(IP_s,IP_d,P_s,P_d,Proto)
+\]
+
+où :
+
+\begin{itemize}
+    \item $IP_s$ : adresse IP source ;
+    \item $IP_d$ : adresse IP destination ;
+    \item $P_s$ : port source ;
+    \item $P_d$ : port destination ;
+    \item $Proto$ : protocole de transport.
+\end{itemize}
+
+Afin de reconnaître les deux directions d'une communication,
+le système utilise une clé canonique ou une association
+entre les deux tuples directionnels.
+
+Les flux incomplets, interrompus ou expirés doivent
+être traités au moyen de délais d'inactivité configurables.
+
+\subsection{Extraction précoce des caractéristiques}
+
+La classification précoce constitue un élément central
+de la conception.
+
+Au lieu d'attendre la fin d'une communication, le système
+construit une représentation à partir des $N$ premiers
+paquets observés.
+
+On définit :
+
+\[
+F_N=\{p_1,p_2,\ldots,p_N\}
+\]
+
+où $p_i$ représente le $i$-ème paquet observé.
+
+Le vecteur de caractéristiques peut être défini par :
+
+\[
+X_N=(x_1,x_2,\ldots,x_m)
+\]
+
+Les caractéristiques envisagées comprennent :
+
+\begin{table}[H]
+\centering
+\caption{Caractéristiques envisagées pour la représentation des flux}
+\label{tab:features}
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Caractéristique} & \textbf{Description} &
+\textbf{Intérêt} \\
+\hline
+Packet count &
+Nombre de paquets observés &
+Mesure du volume initial. \\
+\hline
+Mean packet size &
+Taille moyenne des paquets &
+Caractérise les échanges. \\
+\hline
+Standard deviation &
+Dispersion des tailles &
+Mesure la variabilité. \\
+\hline
+Inter-arrival time &
+Intervalle entre deux paquets &
+Caractérise le rythme. \\
+\hline
+Flow duration &
+Durée de la fenêtre observée &
+Représente le comportement temporel. \\
+\hline
+Forward/Backward ratio &
+Rapport entre les deux directions &
+Caractérise la symétrie des échanges. \\
+\hline
+Packet size sequence &
+Séquence ordonnée des tailles &
+Permet une exploitation par CNN 1D. \\
+\hline
+Transport protocol &
+TCP ou UDP &
+Apporte un contexte de transport. \\
+\hline
+\end{tabularx}
+\end{table}
+
+La taille moyenne est calculée selon :
+
+\[
+\overline{L}=
+\frac{1}{N}\sum_{i=1}^{N}L_i
+\]
+
+La variance des tailles est :
+
+\[
+\sigma_L^2=
+\frac{1}{N}\sum_{i=1}^{N}
+(L_i-\overline{L})^2
+\]
+
+L'intervalle temporel moyen est défini par :
+
+\[
+\overline{\Delta t}=
+\frac{1}{N-1}
+\sum_{i=2}^{N}(t_i-t_{i-1})
+\]
+
+Ces indicateurs permettent de représenter le comportement
+du flux sans analyser directement son contenu applicatif.
+
+\subsection{Prétraitement des caractéristiques}
+
+Avant leur utilisation par les modèles, les caractéristiques
+doivent subir plusieurs opérations :
+
+\begin{itemize}
+    \item vérification des valeurs manquantes ;
+    \item détection des valeurs non numériques ;
+    \item traitement des valeurs infinies ;
+    \item normalisation lorsque le modèle l'exige ;
+    \item sélection et conservation d'un ordre fixe
+    des caractéristiques.
+\end{itemize}
+
+Pour une caractéristique normalisée par standardisation :
+
+\[
+z_i=\frac{x_i-\mu_i}{\sigma_i}
+\]
+
+où $\mu_i$ et $\sigma_i$ représentent respectivement
+la moyenne et l'écart-type calculés sur les données
+d'entraînement.
+
+Les paramètres du prétraitement doivent être appris
+uniquement sur l'ensemble d'entraînement afin d'éviter
+les fuites d'information vers les ensembles de validation
+et de test.
+
+\subsection{Considérations relatives au chiffrement}
+
+Les protocoles modernes limitent l'exploitation
+des informations applicatives.
+
+TLS 1.3 chiffre une grande partie des échanges de négociation.
+QUIC s'appuie également sur TLS 1.3 et transporte
+les données sur UDP.
+
+Le SNI ou certaines informations DNS peuvent être
+exploitables dans certains contextes, mais leur disponibilité
+ne doit pas être supposée systématiquement.
+
+L'Encrypted Client Hello (ECH), les mécanismes de
+tunneling et les évolutions des protocoles rendent
+nécessaire une conception reposant principalement
+sur des caractéristiques comportementales.
+
+Ainsi, le système doit fonctionner même lorsque
+les métadonnées applicatives sont absentes.
+
+% ------------------------------------------------------------
+\section{Conception du module d'apprentissage automatique}
+% ------------------------------------------------------------
+
+\subsection{Objectif du classifieur}
+
+Le module ML a pour objectif d'estimer la catégorie
+de trafic correspondant au vecteur de caractéristiques
+extrait.
+
+Soit l'ensemble des classes connues :
+
+\[
+C=\{c_1,c_2,\ldots,c_K\}
+\]
+
+Le modèle apprend une fonction :
+
+\[
+f_\theta : \mathbb{R}^{m}\rightarrow C
+\]
+
+où $\theta$ représente les paramètres appris.
+
+La sortie comprend une classe prédite et, lorsque
+le modèle le permet, un vecteur de scores associé
+aux différentes classes.
+
+\subsection{Modèle Random Forest}
+
+Random Forest est retenu comme modèle de référence
+en raison de sa capacité à exploiter des caractéristiques
+numériques et à modéliser des relations non linéaires.
+
+Il s'agit d'une méthode d'ensemble combinant plusieurs
+arbres de décision entraînés sur des échantillons
+et des sous-ensembles de caractéristiques.
+
+Pour une observation $X$, la prédiction majoritaire
+peut être représentée par :
+
+\[
+\widehat{y}(X)=
+\operatorname{mode}
+\{T_1(X),T_2(X),\ldots,T_M(X)\}
+\]
+
+où $T_j$ représente le $j$-ième arbre et $M$
+le nombre total d'arbres.
+
+La sortie probabiliste brute d'une classe peut être
+estimée à partir de la proportion de votes ou des
+probabilités agrégées des arbres.
+
+Cependant, ces scores ne doivent pas être considérés
+automatiquement comme des probabilités parfaitement
+calibrées.
+
+Une étape de calibration pourra être appliquée
+sur un ensemble de validation indépendant.
+
+\subsection{Modèle CNN 1D}
+
+En complément du modèle Random Forest, une architecture
+CNN 1D peut être envisagée afin d'exploiter les séquences
+ordonnées de caractéristiques issues des premiers paquets.
+
+Contrairement à un modèle utilisant uniquement
+des statistiques agrégées, un CNN 1D peut apprendre
+des motifs locaux dans une séquence.
+
+L'entrée peut être représentée par une matrice :
+
+\[
+X\in\mathbb{R}^{N\times d}
+\]
+
+où $N$ représente le nombre de paquets observés
+et $d$ le nombre de caractéristiques associées
+à chaque paquet.
+
+Une architecture simplifiée comprend :
+
+\begin{enumerate}
+    \item une couche d'entrée ;
+    \item une ou plusieurs couches de convolution 1D ;
+    \item une fonction d'activation ReLU ;
+    \item une opération de pooling ;
+    \item une couche entièrement connectée ;
+    \item une couche Softmax pour produire les scores
+    des classes.
+\end{enumerate}
+
+La convolution peut être représentée par :
+
+\[
+Y_{i,j}=
+\sum_{k=0}^{r-1}
+\sum_{c=1}^{d}
+W_{k,c,j}X_{i+k,c}+b_j
+\]
+
+où $W$ représente les poids du filtre et $b$
+le biais associé.
+
+Le CNN 1D constitue une extension comparative :
+son adoption définitive dépendra des ressources
+disponibles, de la quantité de données et des résultats
+obtenus.
+
+\subsection{Comparaison des deux approches}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison conceptuelle des modèles}
+\label{tab:comparaison_ml}
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Critère} & \textbf{Random Forest} &
+\textbf{CNN 1D} \\
+\hline
+Entrée &
+Caractéristiques statistiques &
+Séquences ordonnées. \\
+\hline
+Complexité &
+Modérée &
+Plus élevée. \\
+\hline
+Interprétabilité &
+Importance des caractéristiques et SHAP &
+Explications plus complexes. \\
+\hline
+Entraînement &
+Généralement plus simple &
+Nécessite davantage de réglages. \\
+\hline
+Utilisation &
+Modèle de référence &
+Modèle complémentaire. \\
+\hline
+\end{tabularx}
+\end{table}
+
+% ------------------------------------------------------------
+\section{Conception du moteur de règles symboliques}
+% ------------------------------------------------------------
+
+\subsection{Principe}
+
+Le moteur de règles symboliques représente une source
+de connaissance explicite indépendante du modèle ML.
+
+Il applique des conditions prédéfinies sur les métadonnées
+et les caractéristiques disponibles.
+
+Chaque règle est définie par :
+
+\[
+R_i=(C_i,L_i,w_i)
+\]
+
+où :
+
+\begin{itemize}
+    \item $C_i$ représente la condition d'activation ;
+    \item $L_i$ représente la classe suggérée ;
+    \item $w_i$ représente le poids associé à la règle.
+\end{itemize}
+
+Une règle peut être représentée par :
+
+\[
+C_i(X)=
+\begin{cases}
+1 & \text{si la condition est satisfaite}\\
+0 & \text{sinon}
+\end{cases}
+\]
+
+Le score symbolique d'une classe peut être calculé
+à partir des règles actives :
+
+\[
+S_R(c)=
+\frac{
+\sum_{i:L_i=c}w_iC_i(X)
+}{
+\sum_i w_iC_i(X)+\varepsilon
+}
+\]
+
+avec $\varepsilon$ une petite constante évitant
+une division par zéro.
+
+Si aucune règle n'est activée, le moteur doit retourner
+un état d'absence d'information plutôt qu'une prédiction
+arbitraire.
+
+\subsection{Exemples de règles}
+
+\begin{table}[H]
+\centering
+\caption{Exemples de règles symboliques}
+\label{tab:regles}
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{ID} & \textbf{Condition} &
+\textbf{Résultat proposé} \\
+\hline
+R1 &
+Métadonnées disponibles correspondant à un service
+temps réel connu &
+Indice en faveur de VoIP. \\
+\hline
+R2 &
+Caractéristiques temporelles compatibles avec
+un flux interactif &
+Indice en faveur d'un trafic interactif. \\
+\hline
+R3 &
+Métadonnées applicatives absentes &
+Aucune conclusion applicative. \\
+\hline
+R4 &
+Conditions contradictoires entre plusieurs règles &
+Signalement d'une ambiguïté. \\
+\hline
+R5 &
+Métadonnées spécifiques et cohérentes avec une
+catégorie connue &
+Augmentation du score de cette catégorie. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Ces règles constituent des exemples de conception.
+Leurs conditions exactes devront être déterminées
+à partir des protocoles et des données retenus.
+
+Une règle fondée uniquement sur un port ne doit pas
+être considérée comme une preuve suffisante de l'identité
+d'une application.
+
+% ------------------------------------------------------------
+\section{Conception du moteur d'arbitrage hybride}
+% ------------------------------------------------------------
+
+\subsection{Rôle de l'arbitre}
+
+L'arbitre constitue le composant décisionnel central.
+
+Il reçoit les résultats du classifieur ML et du moteur
+symbolique, puis détermine une décision unique.
+
+Il doit notamment :
+
+\begin{itemize}
+    \item vérifier la disponibilité des deux résultats ;
+    \item comparer les classes suggérées ;
+    \item combiner les scores disponibles ;
+    \item détecter les situations contradictoires ;
+    \item évaluer la confiance de la décision ;
+    \item déclencher le rejet lorsque les conditions
+    de fiabilité ne sont pas satisfaites.
+\end{itemize}
+
+\subsection{Formalisation mathématique}
+
+Soit :
+
+\[
+P_{ML}(c|X)
+\]
+
+la probabilité calibrée estimée par le classifieur ML
+pour une classe $c$.
+
+Soit :
+
+\[
+S_R(c|X)
+\]
+
+le score symbolique normalisé associé à cette classe.
+
+Les poids de fusion sont définis par :
+
+\[
+\alpha+\beta=1
+\]
+
+avec :
+
+\[
+0\leq\alpha\leq1,\qquad
+0\leq\beta\leq1
+\]
+
+Le score hybride est alors :
+
+\[
+S_H(c|X)=
+\alpha P_{ML}(c|X)
++
+\beta S_R(c|X)
+\]
+
+Le score maximal correspond à la classe candidate :
+
+\[
+c^*=\arg\max_{c\in C}S_H(c|X)
+\]
+
+Cette formulation suppose que les scores ML et symboliques
+sont comparables et normalisés. Une calibration ou une
+transformation des scores symboliques peut être nécessaire.
+
+\subsection{Prise en compte des désaccords}
+
+La seule maximisation du score hybride ne suffit pas
+à caractériser toutes les situations.
+
+L'arbitre doit également mesurer la cohérence
+entre les deux sources de décision.
+
+On définit :
+
+\[
+A(X)=
+\begin{cases}
+1 & \text{si les deux modules sont disponibles}\\
+0 & \text{sinon}
+\end{cases}
+\]
+
+Un indicateur de désaccord peut être défini par :
+
+\[
+D(X)=
+\begin{cases}
+0 & \text{si les deux classes sont identiques}\\
+1 & \text{sinon}
+\end{cases}
+\]
+
+Le système peut ensuite appliquer une politique
+différenciée :
+
+\begin{itemize}
+    \item accord entre les modules : fusion normale ;
+    \item désaccord faible : fusion avec pénalité ;
+    \item désaccord important : rejet ou décision prudente ;
+    \item absence d'un module : fonctionnement dégradé
+    explicitement identifié.
+\end{itemize}
+
+Il est important de ne pas interpréter une absence
+de règle comme une contradiction. Une absence
+d'information et une preuve contraire sont deux
+situations différentes.
+
+\subsection{Politique de décision}
+
+Soit $\tau$ le seuil minimal de confiance et
+$\delta$ un seuil de désaccord.
+
+La décision est définie par :
+
+\[
+Decision(X)=
+\begin{cases}
+c^* & \text{si } S_H(c^*|X)\geq\tau
+\text{ et } D(X)<\delta\\
+Inconnu & \text{sinon}
+\end{cases}
+\]
+
+Les seuils $\tau$ et $\delta$ seront déterminés
+sur les données de validation.
+
+Cette politique permet de distinguer une prédiction
+forte et cohérente d'une décision reposant sur
+des informations insuffisantes.
+
+\subsection{Pseudo-code de l'arbitrage}
+
+\begin{algorithm}[H]
+\caption{Arbitrage hybride et décision de rejet}
+\label{alg:arbitrage}
+\begin{algorithmic}[1]
+
+\Require Scores ML, scores symboliques,
+poids $\alpha,\beta$, seuil $\tau$
+
+\Ensure Classe finale ou statut Inconnu
+
+\State Vérifier la disponibilité des résultats
+\State Normaliser les scores symboliques
+
+\If{le classifieur ML est indisponible}
+    \State Retourner le statut de repli défini
+\EndIf
+
+\ForAll{$c\in C$}
+    \State Calculer :
+    \[
+    S_H(c)=\alpha P_{ML}(c)+\beta S_R(c)
+    \]
+\EndFor
+
+\State Déterminer la classe candidate $c^*$
+
+\State Évaluer la cohérence des deux modules
+
+\If{$S_H(c^*)<\tau$}
+    \State Retourner \texttt{INCONNU}
+\ElsIf{Contradiction importante}
+    \State Retourner \texttt{INCONNU}
+\Else
+    \State Retourner $c^*$
+\EndIf
+
+\end{algorithmic}
+\end{algorithm}
+
+% ------------------------------------------------------------
+\section{Conception du mécanisme de rejet des flux inconnus}
+% ------------------------------------------------------------
+
+\subsection{Problématique de la classification en ensemble ouvert}
+
+Un modèle supervisé classique est généralement entraîné
+sur un ensemble limité de catégories.
+
+Lorsqu'un nouveau type de trafic apparaît, le modèle
+peut néanmoins lui attribuer l'une des catégories
+connues, même si cette attribution est incorrecte.
+
+Ce problème correspond à la limite de la classification
+en ensemble fermé.
+
+Dans notre système, l'espace des observations peut
+comprendre :
+
+\[
+\mathcal{X}=
+\mathcal{X}_{known}
+\cup
+\mathcal{X}_{unknown}
+\]
+
+Le système doit donc être capable de reconnaître
+les observations qui ne sont pas suffisamment
+compatibles avec les catégories connues.
+
+\subsection{Mécanisme de rejet}
+
+Le rejet repose sur plusieurs indicateurs :
+
+\begin{itemize}
+    \item score maximal du classifieur ;
+    \item score hybride ;
+    \item écart entre les deux meilleures classes ;
+    \item désaccord entre le ML et les règles ;
+    \item disponibilité et qualité des caractéristiques.
+\end{itemize}
+
+L'écart entre les deux meilleures classes est défini par :
+
+\[
+M(X)=S_H(c_1|X)-S_H(c_2|X)
+\]
+
+avec $c_1$ et $c_2$ les deux classes présentant
+les scores les plus élevés.
+
+Une marge faible peut signaler une ambiguïté entre
+plusieurs classes.
+
+Le système peut ainsi utiliser un seuil supplémentaire
+sur cette marge afin d'améliorer la prudence des décisions.
+
+\subsection{Calibration des scores}
+
+La calibration est une étape importante car un score
+élevé ne correspond pas nécessairement à une confiance
+réelle élevée.
+
+La calibration peut être effectuée à l'aide de méthodes
+telles que :
+
+\begin{itemize}
+    \item calibration sigmoïde ;
+    \item calibration isotonic regression.
+\end{itemize}
+
+Elle doit être entraînée sur un ensemble de validation
+séparé de l'ensemble d'apprentissage.
+
+La qualité de calibration pourra être évaluée
+à l'aide des courbes de fiabilité, du Brier Score
+et de la log-loss.
+
+\subsection{Politique QoS pour les flux rejetés}
+
+Lorsqu'un flux est classé comme inconnu, le système
+ne doit pas lui attribuer automatiquement une priorité
+élevée.
+
+La politique recommandée est une classe par défaut
+de type Best Effort, soumise aux règles générales
+de limitation et de sécurité du réseau.
+
+Le rejet ne signifie pas nécessairement que le flux
+est malveillant. Il signifie uniquement que le système
+ne dispose pas de suffisamment d'informations fiables
+pour lui attribuer une catégorie connue.
+
+% ------------------------------------------------------------
+\section{Conception du module d'explicabilité}
+% ------------------------------------------------------------
+
+\subsection{Objectif}
+
+L'explicabilité permet de comprendre les facteurs
+ayant contribué à une décision de classification.
+
+Le système envisage l'utilisation de SHAP
+(\textit{SHapley Additive exPlanations}) afin
+d'expliquer les prédictions du modèle ML.
+
+Pour une observation $x$, une explication additive
+peut être représentée par :
+
+\[
+f(x)=\phi_0+\sum_{i=1}^{m}\phi_i
+\]
+
+où :
+
+\begin{itemize}
+    \item $\phi_0$ représente la valeur de référence ;
+    \item $\phi_i$ représente la contribution de
+    la caractéristique $i$ ;
+    \item $m$ représente le nombre de caractéristiques.
+\end{itemize}
+
+Une valeur positive peut contribuer à augmenter
+la prédiction d'une classe, tandis qu'une valeur
+négative peut la diminuer, selon la classe expliquée
+et la convention utilisée.
+
+\subsection{Explication de la décision hybride}
+
+L'explication globale ne doit pas se limiter
+à la sortie SHAP du modèle ML.
+
+Elle doit également intégrer :
+
+\begin{itemize}
+    \item les règles activées ;
+    \item les règles non satisfaites importantes ;
+    \item le score produit par chaque module ;
+    \item le niveau de cohérence ;
+    \item le seuil appliqué ;
+    \item la raison d'un éventuel rejet.
+\end{itemize}
+
+Ainsi, une décision pourra être accompagnée
+d'une justification structurée.
+
+Exemple :
+
+\begin{quote}
+Le flux a été associé à la catégorie VoIP.
+Le classifieur ML a fourni un score élevé.
+Les règles disponibles apportent des indices cohérents.
+Le score hybride dépasse le seuil de décision.
+La politique QoS correspondante peut donc être appliquée.
+\end{quote}
+
+Pour un flux inconnu, la justification pourra indiquer
+que le score est insuffisant ou que les sources
+de décision présentent un désaccord important.
+
+% ------------------------------------------------------------
+\section{Conception des données}
+% ------------------------------------------------------------
+
+\subsection{Modèle conceptuel des données}
+
+Le système doit manipuler les informations relatives
+aux flux, aux caractéristiques, aux prédictions,
+aux règles, aux décisions et aux politiques QoS.
+
+Les principales entités sont :
+
+\begin{itemize}
+    \item Flux ;
+    \item Caractéristique ;
+    \item Classification ;
+    \item Règle ;
+    \item Décision ;
+    \item Politique QoS.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\IfFileExists{img/diag/mcd.png}{
+\includegraphics[width=\textwidth]{img/diag/mcd.png}
+}{
+\fbox{\parbox{0.85\textwidth}{
+\centering
+\vspace{1cm}
+EMPLACEMENT : modèle conceptuel des données\\
+Fichier : img/diag/mcd.png
+\vspace{1cm}
+}}
+}
+\caption{Modèle conceptuel des données}
+\label{fig:mcd}
+\end{figure}
+
+\subsection{Description des entités}
+
+\begin{table}[H]
+\centering
+\caption{Structure conceptuelle des entités}
+\label{tab:entites_mcd}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{Entité} & \textbf{Attributs proposés} \\
+\hline
+Flux &
+id\_flux, protocole, ip\_source, ip\_destination,
+port\_source, port\_destination, date\_debut,
+date\_fin. \\
+\hline
+Caractéristique &
+id\_caracteristique, id\_flux, nombre\_paquets,
+taille\_moyenne, variance, intervalle\_moyen,
+durée\_observation. \\
+\hline
+Classification &
+id\_classification, id\_flux, modèle,
+classe\_predite, score, date. \\
+\hline
+Règle &
+id\_regle, condition, classe\_suggeree,
+poids, état. \\
+\hline
+Décision &
+id\_decision, id\_flux, classe\_finale,
+statut, score\_hybride, justification. \\
+\hline
+Politique QoS &
+id\_politique, classe, DSCP, priorité,
+paramètres\_HTB. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Relations entre les entités}
+
+Les relations conceptuelles sont définies comme suit :
+
+\begin{itemize}
+    \item Un flux possède plusieurs caractéristiques.
+    \item Un flux peut faire l'objet de plusieurs classifications.
+    \item Plusieurs règles peuvent être évaluées pour un flux.
+    \item Un flux peut posséder plusieurs décisions
+    enregistrées au cours de son cycle de vie.
+    \item Une décision peut être associée à une politique QoS.
+    \item Une politique QoS peut être utilisée par
+    plusieurs décisions.
+\end{itemize}
+
+Cette organisation permet de conserver une traçabilité
+entre les observations, les prédictions et les actions
+effectuées.
+
+% ------------------------------------------------------------
+\section{Conception des interfaces et contrats d'échange}
+% ------------------------------------------------------------
+
+\subsection{Principe}
+
+Les modules doivent communiquer au moyen de formats
+d'échange cohérents et indépendants de leur implémentation.
+
+Le format JSON est proposé pour les échanges entre
+composants lorsque ceux-ci sont exécutés séparément
+ou communiquent par une interface structurée.
+
+Les interfaces peuvent également être réalisées
+sous forme de fonctions Python si l'architecture
+retenue est monolithique.
+
+\subsection{Contrat d'entrée du classifieur}
+
+\begin{verbatim}
+{
+  "flow_id": "flow_001",
+  "protocol": "TCP",
+  "packet_count": 10,
+  "mean_packet_size": 180.5,
+  "std_packet_size": 35.2,
+  "mean_interarrival_time": 0.02,
+  "duration": 1.8,
+  "direction_ratio": 0.65
+}
+\end{verbatim}
+
+\subsection{Contrat de sortie du classifieur}
+
+\begin{verbatim}
+{
+  "flow_id": "flow_001",
+  "model": "RandomForest",
+  "predicted_class": "VoIP",
+  "class_scores": {
+    "VoIP": 0.92,
+    "Video": 0.05,
+    "Web": 0.03
+  }
+}
+\end{verbatim}
+
+\subsection{Contrat de sortie du moteur symbolique}
+
+\begin{verbatim}
+{
+  "flow_id": "flow_001",
+  "activated_rules": ["R1", "R2"],
+  "suggested_class": "VoIP",
+  "rule_score": 0.85,
+  "evidence_available": true
+}
+\end{verbatim}
+
+\subsection{Contrat de sortie de l'arbitre}
+
+\begin{verbatim}
+{
+  "flow_id": "flow_001",
+  "final_class": "VoIP",
+  "status": "known",
+  "hybrid_score": 0.89,
+  "decision_reason": "ML and rules agree",
+  "qos_policy": "high_priority"
+}
+\end{verbatim}
+
+Ces structures constituent des contrats proposés.
+Elles devront être harmonisées entre les modules
+au début de la phase d'implémentation.
+
+Les scores doivent conserver une signification précise :
+probabilité calibrée, score de règle ou score hybride.
+Ils ne doivent pas être mélangés sans normalisation.
+
+% ------------------------------------------------------------
+\section{Conception de la couche QoS}
+% ------------------------------------------------------------
+
+\subsection{Objectif}
+
+La couche QoS exploite la décision finale afin
+d'appliquer une politique de traitement adaptée
+à la catégorie de trafic.
+
+La qualité de service repose sur plusieurs paramètres,
+notamment :
+
+\begin{itemize}
+    \item latence ;
+    \item gigue ;
+    \item débit ;
+    \item taux de pertes ;
+    \item répartition des ressources réseau.
+\end{itemize}
+
+\subsection{Marquage DSCP}
+
+Le champ DSCP est défini dans le champ Differentiated
+Services des en-têtes IPv4 et IPv6.
+
+Il utilise six bits pour identifier un codepoint
+associé à un comportement de traitement par saut
+(\textit{Per-Hop Behavior}).
+
+La valeur DSCP peut être utilisée par les équipements
+réseau afin de sélectionner une politique de traitement.
+
+La correspondance entre les classes applicatives
+et les valeurs DSCP relève toutefois de la politique
+de l'administrateur réseau.
+
+\subsection{Gestion des files HTB}
+
+HTB (\textit{Hierarchical Token Bucket}) permet
+d'organiser les classes de trafic et de contrôler
+la bande passante attribuée.
+
+Le système peut utiliser une hiérarchie de classes
+pour séparer les catégories de trafic.
+
+Une organisation conceptuelle peut être définie :
+
+\begin{itemize}
+    \item classe racine ;
+    \item classe prioritaire pour les communications
+    temps réel validées ;
+    \item classe intermédiaire pour la vidéo ;
+    \item classe standard pour le trafic Web ;
+    \item classe Best Effort pour les flux inconnus.
+\end{itemize}
+
+Les paramètres de débit, de plafond et de priorité
+seront déterminés expérimentalement.
+
+\subsection{Table de correspondance indicative}
+
+\begin{table}[H]
+\centering
+\caption{Politique QoS conceptuelle}
+\label{tab:politique_qos}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\textbf{Catégorie} & \textbf{Traitement} &
+\textbf{Objectif} \\
+\hline
+VoIP validé &
+Priorité élevée &
+Limiter la latence et la gigue. \\
+\hline
+Vidéo &
+Bande passante adaptée &
+Préserver la fluidité. \\
+\hline
+Web &
+File standard &
+Assurer un traitement équilibré. \\
+\hline
+Inconnu &
+Best Effort &
+Éviter une priorité non justifiée. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Il convient de préciser que le marquage DSCP ne garantit
+pas à lui seul une qualité de service de bout en bout.
+Les équipements traversés doivent appliquer une politique
+compatible.
+
+% ------------------------------------------------------------
+\section{Conception des diagrammes UML}
+% ------------------------------------------------------------
+
+\subsection{Diagramme de composants}
+
+Le diagramme de composants présente les unités logicielles
+et leurs relations.
+
+Il doit montrer les interfaces entre :
+
+\begin{itemize}
+    \item capture réseau ;
+    \item extraction des caractéristiques ;
+    \item classifieur ML ;
+    \item moteur de règles ;
+    \item arbitre ;
+    \item module SHAP ;
+    \item gestionnaire QoS ;
+    \item journalisation.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\IfFileExists{img/diag/diagramme_composants.png}{
+\includegraphics[width=\textwidth]
+{img/diag/diagramme_composants.png}
+}{
+\fbox{\parbox{0.85\textwidth}{
+\centering
+\vspace{1cm}
+EMPLACEMENT : diagramme de composants UML\\
+Fichier : img/diag/diagramme\_composants.png
+\vspace{1cm}
+}}
+}
+\caption{Diagramme de composants de l'agent hybride}
+\label{fig:composants}
+\end{figure}
+
+\subsection{Diagramme de déploiement}
+
+Le diagramme de déploiement représente l'environnement
+d'exécution du système.
+
+Il doit identifier :
+
+\begin{itemize}
+    \item l'interface réseau de capture ;
+    \item l'environnement Linux ;
+    \item le processus de l'agent Python ;
+    \item les fichiers des modèles ML ;
+    \item le moteur de règles ;
+    \item le mécanisme Linux TC ;
+    \item l'environnement Mininet lorsque celui-ci
+    est utilisé pour l'expérimentation.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\IfFileExists{img/diag/diagramme_deploiement.png}{
+\includegraphics[width=0.95\textwidth]
+{img/diag/diagramme_deploiement.png}
+}{
+\fbox{\parbox{0.85\textwidth}{
+\centering
+\vspace{1cm}
+EMPLACEMENT : diagramme de déploiement UML\\
+Fichier : img/diag/diagramme\_deploiement.png
+\vspace{1cm}
+}}
+}
+\caption{Diagramme de déploiement de la solution}
+\label{fig:deploiement}
+\end{figure}
+
+\subsection{Diagramme de séquence de classification}
+
+Ce diagramme décrit l'interaction entre les composants
+lorsqu'un flux connu est traité.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{img/diag/sequence_classification.png}{
+\includegraphics[width=\textwidth]
+{img/diag/sequence_classification.png}
+}{
+\fbox{\parbox{0.85\textwidth}{
+\centering
+\vspace{1cm}
+EMPLACEMENT : séquence de classification\\
+Fichier : img/diag/sequence\_classification.png
+\vspace{1cm}
+}}
+}
+\caption{Séquence de classification d'un flux connu}
+\label{fig:sequence}
+\end{figure}
+
+\subsection{Diagramme de séquence du rejet}
+
+Ce diagramme représente le cas dans lequel les scores
+ne permettent pas d'identifier une catégorie connue
+avec un niveau de confiance suffisant.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{img/diag/sequence_rejet.png}{
+\includegraphics[width=\textwidth]
+{img/diag/sequence_rejet.png}
+}{
+\fbox{\parbox{0.85\textwidth}{
+\centering
+\vspace{1cm}
+EMPLACEMENT : séquence de rejet\\
+Fichier : img/diag/sequence\_rejet.png
+\vspace{1cm}
+}}
+}
+\caption{Séquence de rejet d'un flux inconnu}
+\label{fig:sequence_rejet}
+\end{figure}
 
 % ------------------------------------------------------------
 \section{Sécurité, fiabilité et gestion des erreurs}
 % ------------------------------------------------------------
 
-\subsection{Sécurité}
+\subsection{Sécurité de la capture}
 
-La solution doit respecter plusieurs principes
-de sécurité lors de son exécution.
+La capture réseau nécessite des privilèges particuliers.
+Il est recommandé de limiter les privilèges du composant
+de capture et de ne pas exécuter inutilement l'ensemble
+de l'application avec des droits administrateur.
 
-L'accès aux interfaces réseau et la modification
-des politiques QoS doivent être réservés aux
-utilisateurs ou processus autorisés.
+Les données collectées doivent être limitées aux
+informations nécessaires à l'expérimentation.
 
-Les règles expertes et les paramètres de
-classification doivent être protégés contre
-les modifications non autorisées.
+\subsection{Sécurité de l'application QoS}
 
-La journalisation doit également éviter de
-conserver inutilement des informations sensibles
-relatives aux communications observées.
+La modification des règles réseau doit être effectuée
+par un composant disposant des privilèges nécessaires.
 
-\subsection{Fiabilité du traitement}
+Les commandes de configuration ne doivent pas être
+construites directement à partir de données non validées
+issues des paquets.
 
-Le système doit être capable de gérer les situations
-dans lesquelles les informations reçues sont
-incomplètes ou incorrectes.
-
-Des contrôles doivent être effectués lors de
-l'extraction des caractéristiques et du prétraitement.
-
-En particulier, les valeurs manquantes, les
-valeurs infinies et les caractéristiques
-incompatibles avec le modèle doivent être
-traitées explicitement.
+Une liste de politiques autorisées doit être définie
+afin d'éviter l'exécution de commandes arbitraires.
 
 \subsection{Gestion des erreurs}
 
-Les principales situations d'erreur envisagées
-sont les suivantes :
-
-\begin{itemize}
-    \item Échec de la capture des paquets ;
-    \item Erreur lors de l'identification d'un flux ;
-    \item Caractéristiques incomplètes ou invalides ;
-    \item Échec du chargement du modèle ;
-    \item Absence de règle applicable ;
-    \item Désaccord entre le modèle et les règles ;
-    \item Échec de l'application d'une politique QoS ;
-    \item Indisponibilité du mécanisme de stockage.
-\end{itemize}
-
-Chaque erreur doit être journalisée et traitée
-selon une stratégie adaptée afin d'éviter
-l'interruption incontrôlée du système.
+\begin{table}[H]
+\centering
+\caption{Stratégies de gestion des erreurs}
+\label{tab:erreurs}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{Erreur} & \textbf{Comportement prévu} \\
+\hline
+Paquets insuffisants &
+Poursuivre l'observation ou déclarer une décision
+différée. \\
+\hline
+Caractéristiques manquantes &
+Appliquer le prétraitement prévu ou signaler
+une observation invalide. \\
+\hline
+Échec du modèle ML &
+Signaler l'indisponibilité et appliquer le mode
+de repli défini. \\
+\hline
+Absence de règle &
+Ne pas inventer de classe symbolique. \\
+\hline
+Désaccord important &
+Déclencher la politique de rejet. \\
+\hline
+Échec QoS &
+Journaliser l'échec et conserver la politique
+réseau de repli. \\
+\hline
+Saturation du système &
+Limiter la charge et éviter la perte silencieuse
+des observations. \\
+\hline
+\end{tabularx}
+\end{table}
 
 % ------------------------------------------------------------
-\section{Considérations de performance et d'évolutivité}
+\section{Protocole expérimental et stratégie d'évaluation}
 % ------------------------------------------------------------
 
-\subsection{Classification précoce}
+\subsection{Principe de comparaison}
 
-L'un des objectifs du projet est de classifier
-le trafic chiffré à partir d'informations
-disponibles relativement tôt dans la vie d'un flux.
+La conception prévoit trois configurations expérimentales
+afin d'isoler la contribution de chaque composant.
 
-L'extraction des caractéristiques doit donc
-prendre en considération le nombre de paquets
-observés et la quantité d'informations nécessaires
-à une décision pertinente.
+\begin{table}[H]
+\centering
+\caption{Configurations expérimentales}
+\label{tab:configurations}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{Configuration} & \textbf{Description} \\
+\hline
+IA seule &
+Classification réalisée uniquement par le modèle
+d'apprentissage. \\
+\hline
+Règles seules &
+Classification réalisée uniquement par les règles
+symboliques. \\
+\hline
+Approche hybride &
+Combinaison du modèle ML, des règles, de l'arbitrage
+et du rejet des inconnus. \\
+\hline
+\end{tabularx}
+\end{table}
 
-Une classification précoce permet de réduire
-le délai de décision, mais peut également
-diminuer la précision lorsque les informations
-disponibles sont insuffisantes.
+Cette comparaison permet de déterminer si l'approche
+hybride apporte une amélioration par rapport aux
+approches prises individuellement.
 
-Il est donc nécessaire d'étudier expérimentalement
-le compromis entre rapidité de classification
-et qualité des prédictions.
+\subsection{Stratégie de constitution des données}
 
-\subsection{Optimisation des ressources}
+Les données doivent être séparées en ensembles
+d'entraînement, de validation et de test.
 
-La conception modulaire permet d'envisager
-plusieurs pistes d'optimisation :
+Une séparation aléatoire au niveau des lignes peut
+produire une fuite d'information lorsque plusieurs
+enregistrements proviennent d'une même capture
+ou d'une même communication.
+
+Il est donc préférable de réaliser une séparation
+par flux, session, capture ou période temporelle
+selon la structure du jeu de données.
+
+Les flux inconnus utilisés pour évaluer le rejet
+ne doivent pas être présents dans l'entraînement
+du classifieur fermé.
+
+\subsection{Métriques de classification}
+
+La précision globale est définie par :
+
+\[
+Accuracy=
+\frac{TP+TN}{TP+TN+FP+FN}
+\]
+
+La précision d'une classe est :
+
+\[
+Precision=
+\frac{TP}{TP+FP}
+\]
+
+Le rappel est :
+
+\[
+Recall=
+\frac{TP}{TP+FN}
+\]
+
+Le score F1 est :
+
+\[
+F1=
+2\frac{Precision\times Recall}
+{Precision+Recall}
+\]
+
+Dans un contexte multiclasse, les mesures macro
+et pondérées doivent être rapportées afin de tenir
+compte des déséquilibres éventuels entre catégories.
+
+\subsection{Métriques du rejet}
+
+L'évaluation du mécanisme de rejet doit distinguer
+les flux connus correctement acceptés, les flux
+connus rejetés à tort et les flux inconnus correctement
+rejetés.
+
+Les indicateurs envisagés comprennent :
 
 \begin{itemize}
-    \item Limiter les calculs inutiles sur les flux ;
-    \item Réduire les caractéristiques redondantes ;
-    \item Optimiser le traitement des paquets ;
-    \item Éviter les accès excessifs à la base de données ;
-    \item Séparer le traitement des flux de la supervision.
+    \item taux de rejet des flux inconnus ;
+    \item taux de fausse acceptation des inconnus ;
+    \item taux de rejet des flux connus ;
+    \item précision des décisions acceptées ;
+    \item couverture du système.
 \end{itemize}
 
-\subsection{Évolutivité}
+La couverture correspond à la proportion des observations
+pour lesquelles le système accepte de fournir
+une classe connue.
 
-L'architecture proposée permet d'envisager
-l'ajout de nouvelles classes de trafic,
-de nouvelles règles expertes et de nouveaux
-modèles d'apprentissage.
+Elle peut être définie par :
 
-Le remplacement du modèle de classification
-ne nécessite pas obligatoirement une modification
-des modules de capture ou d'application QoS,
-à condition de conserver les interfaces d'échange
-définies.
+\[
+Coverage=
+\frac{N_{\text{acceptes}}}
+{N_{\text{total}}}
+\]
+
+Une bonne stratégie de rejet doit être évaluée
+en tenant compte simultanément de la qualité
+des classifications acceptées et du taux de couverture.
+
+\subsection{Évaluation des performances temporelles}
+
+La classification précoce implique une attention
+particulière au temps de traitement.
+
+Les mesures à effectuer comprennent :
+
+\begin{itemize}
+    \item temps moyen de classification ;
+    \item temps de traitement par flux ;
+    \item nombre de flux traités par seconde ;
+    \item mémoire consommée ;
+    \item nombre de paquets nécessaires à la décision.
+\end{itemize}
+
+\subsection{Évaluation de la QoS}
+
+L'évaluation de la couche QoS doit comparer les
+conditions réseau avec et sans application des
+politiques.
+
+Les mesures comprennent :
+
+\begin{itemize}
+    \item latence moyenne ;
+    \item gigue ;
+    \item débit par catégorie ;
+    \item taux de pertes ;
+    \item équité de répartition des ressources.
+\end{itemize}
+
+Mininet peut être utilisé pour construire un
+environnement réseau contrôlé et reproduire
+des conditions de trafic comparables.
+
+Il est important de distinguer la qualité de
+classification de l'amélioration effective de
+la qualité de service : une bonne précision ML
+ne garantit pas à elle seule une amélioration
+de la latence ou de la gigue.
+
+\subsection{Limites expérimentales}
+
+Les résultats obtenus dépendront de la représentativité
+des données, du nombre de classes, de la diversité
+des applications et des conditions de capture.
+
+Les changements de comportement des applications,
+les évolutions protocolaires et les mécanismes
+de chiffrement peuvent modifier la distribution
+des caractéristiques.
+
+Une évaluation temporelle et une analyse des flux
+inconnus sont donc nécessaires pour éviter de
+surestimer la capacité de généralisation du système.
 
 % ------------------------------------------------------------
 \section{Conclusion}
 % ------------------------------------------------------------
 
 Ce chapitre a présenté la conception technique
-de l'agent hybride de classification du trafic
-chiffré destiné à la gestion de la qualité
-de service.
+de l'agent hybride de classification du trafic chiffré.
 
-L'architecture proposée repose sur une organisation
-modulaire séparant l'acquisition du trafic,
-l'extraction des caractéristiques, la classification
-hybride, le rejet des flux inconnus et l'application
-des politiques QoS.
+L'architecture proposée repose sur une séparation
+modulaire des responsabilités, depuis la capture
+des paquets jusqu'à l'application des politiques QoS.
 
-Les diagrammes UML ont permis de représenter
-l'organisation générale du système, ses composants,
-son environnement de déploiement, son modèle
-de données et ses principaux scénarios de fonctionnement.
+La combinaison d'un classifieur automatique et
+d'un moteur de règles symboliques permet de croiser
+des informations statistiques et des connaissances
+explicites.
 
-La conception distingue également la décision
-de classification de l'action QoS, ce qui permet
-de conserver une architecture évolutive et
-facile à adapter.
+Le moteur d'arbitrage assure la fusion des résultats
+et la gestion des situations d'incertitude, tandis
+que le mécanisme de rejet évite l'attribution
+systématique d'une classe connue aux flux inconnus.
 
-Cette conception constitue la base technique
-de la phase de réalisation. Elle servira de
-référence pour le développement des modules,
-leur intégration et l'évaluation expérimentale
-de la solution proposée.
+La conception intègre également un mécanisme
+d'explicabilité, une modélisation des données,
+des contrats d'interfaces et une stratégie
+d'évaluation expérimentale.
+
+L'ensemble constitue une base technique structurée
+pour la phase d'implémentation, durant laquelle
+les composants seront développés, intégrés et
+évalués dans un environnement expérimental contrôlé.
