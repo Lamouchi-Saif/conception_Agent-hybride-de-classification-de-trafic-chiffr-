@@ -662,3 +662,136 @@ indicateurs seront utilisés durant les expérimentations :
 Les valeurs cibles de ces critères seront déterminées
 à partir du protocole expérimental et des résultats obtenus,
 afin de ne pas imposer de seuils arbitraires avant les tests.
+
+
+\section{Règles de gestion}
+
+Les règles de gestion définissent les conditions et les principes
+qui encadrent le fonctionnement de l'agent hybride. Elles
+permettent de formaliser le comportement attendu des différents
+modules et de garantir la cohérence des décisions prises
+par le système.
+
+Dans le cadre de ce projet, ces règles concernent principalement
+l'analyse des flux, la classification précoce, l'exploitation
+des connaissances symboliques, l'arbitrage des résultats,
+le rejet des flux inconnus et l'application des politiques
+de qualité de service.
+
+\subsection{Liste des règles de gestion}
+
+Les principales règles de gestion identifiées sont présentées
+dans le tableau suivant :
+
+\begin{table}[H]
+\centering
+\caption{Règles de gestion de l'agent hybride}
+\label{tab:regles-gestion}
+\small
+\begin{tabularx}{\textwidth}{|p{1.4cm}|p{3.2cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Règle} & \textbf{Description} \\
+\hline
+
+RG01 & Analyse des flux &
+Chaque flux réseau doit être identifié et analysé à partir
+des caractéristiques extraites des paquets observés. \\
+\hline
+
+RG02 & Classification précoce &
+La classification doit pouvoir être réalisée à partir des
+N premiers paquets du flux, sans attendre nécessairement
+la fin de la communication. \\
+\hline
+
+RG03 & Indépendance des décisions &
+Le classifieur et le moteur de règles doivent produire
+leurs propres résultats de manière indépendante avant
+leur transmission au module d'arbitrage. \\
+\hline
+
+RG04 & Exploitation des règles &
+Le moteur symbolique doit exploiter les informations réseau
+disponibles, notamment les ports, les informations SNI
+et les données DNS lorsqu'elles sont accessibles. \\
+\hline
+
+RG05 & Arbitrage hybride &
+La décision finale doit prendre en compte les résultats
+du modèle d'apprentissage et les informations fournies
+par le moteur de règles, selon la stratégie d'arbitrage
+définie. \\
+\hline
+
+RG06 & Rejet des flux inconnus &
+Lorsqu'un flux ne peut pas être associé de manière
+suffisamment fiable à une classe connue, le système doit
+pouvoir le déclarer comme inconnu. \\
+\hline
+
+RG07 & Absence d'affectation forcée &
+Un flux déclaré inconnu ne doit pas être affecté
+automatiquement à une classe connue uniquement pour
+obtenir une décision de classification. \\
+\hline
+
+RG08 & Politique QoS par défaut &
+Lorsqu'un flux est déclaré inconnu, une politique de
+qualité de service par défaut doit être appliquée,
+conformément à la configuration du système. \\
+\hline
+
+RG09 & Application de la QoS &
+Pour un flux reconnu, la classe retenue par l'arbitrage
+doit être associée à la politique QoS correspondante,
+notamment au moyen du marquage DSCP et des files HTB. \\
+\hline
+
+RG10 & Explicabilité des décisions &
+Les décisions produites par le système doivent pouvoir
+être accompagnées d'informations permettant d'expliquer
+la contribution des caractéristiques utilisées par le
+modèle, notamment à l'aide de SHAP. \\
+\hline
+
+RG11 & Évaluation des décisions &
+Les décisions et les performances de l'agent doivent
+être évaluées à travers des indicateurs de classification,
+de détection des flux inconnus et de qualité de service. \\
+\hline
+
+\end{tabularx}
+\end{table}
+
+\subsection{Principes de traitement des flux}
+
+Le traitement d'un flux réseau repose sur une succession
+d'étapes coordonnées entre les différents modules de l'agent :
+
+\begin{enumerate}
+    \item Le module de perception observe les paquets du flux
+    et extrait les caractéristiques nécessaires à son analyse.
+
+    \item Le classifieur exploite les caractéristiques extraites
+    pour produire des scores ou des probabilités associés
+    aux classes connues.
+
+    \item Le moteur de règles examine les informations réseau
+    disponibles et produit ses propres éléments de décision.
+
+    \item Le module d'arbitrage combine les résultats obtenus
+    afin de retenir une classe connue ou de déclarer le flux
+    comme inconnu.
+
+    \item Le module d'action applique la politique QoS
+    correspondant à la décision finale. Une politique
+    par défaut est utilisée pour les flux inconnus.
+
+    \item Le module d'explication fournit des informations
+    permettant de comprendre les décisions du système.
+\end{enumerate}
+
+La stratégie exacte de fusion des résultats, les seuils
+de confiance et les priorités entre les différentes sources
+de décision seront précisés durant la conception et validés
+expérimentalement.
