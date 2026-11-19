@@ -1,10 +1,9 @@
 \babel@toc {french}{}\relax 
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {2.1}{\ignorespaces Architecture globale proposée pour l'agent hybride}}{17}{figure.caption.9}%
-\contentsline {figure}{\numberline {2.2}{\ignorespaces Décomposition modulaire du système}}{18}{figure.caption.11}%
-\contentsline {figure}{\numberline {2.3}{\ignorespaces Modèle conceptuel des données}}{30}{figure.caption.15}%
-\contentsline {figure}{\numberline {2.4}{\ignorespaces Diagramme de composants de l'agent hybride}}{35}{figure.caption.18}%
-\contentsline {figure}{\numberline {2.5}{\ignorespaces Diagramme de déploiement de la solution}}{35}{figure.caption.19}%
-\contentsline {figure}{\numberline {2.6}{\ignorespaces Séquence de classification d'un flux connu}}{36}{figure.caption.20}%
-\contentsline {figure}{\numberline {2.7}{\ignorespaces Séquence de rejet d'un flux inconnu}}{36}{figure.caption.21}%
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Architecture globale de l'agent hybride de classification du trafic chiffré}}{15}{figure.caption.5}%
+\contentsline {figure}{\numberline {2.2}{\ignorespaces Diagramme UML des composants logiciels de l'agent hybride}}{20}{figure.caption.16}%
+\contentsline {figure}{\numberline {2.3}{\ignorespaces Diagramme UML de déploiement de l'agent hybride}}{22}{figure.caption.17}%
+\contentsline {figure}{\numberline {2.4}{\ignorespaces Modèle conceptuel des données de l'agent hybride}}{24}{figure.caption.18}%
+\contentsline {figure}{\numberline {2.5}{\ignorespaces Diagramme de séquence de la classification d'un flux connu}}{26}{figure.caption.21}%
+\contentsline {figure}{\numberline {2.6}{\ignorespaces Diagramme de séquence du rejet d'un flux inconnu et de son traitement en Best Effort}}{27}{figure.caption.24}%

@@ -5,6 +5,7 @@
 % -------------------------------------------------
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
+\usepackage[numbers]{natbib}
 \usepackage[french]{babel}
 \usepackage{lmodern}
 \usepackage{microtype}
@@ -160,12 +161,6 @@
 \cfoot{\thepage}
 
 % -------------------------------------------------
-% Bibliographie
-% -------------------------------------------------
-\usepackage[numbers]{natbib}
-
-
-% -------------------------------------------------
 % COMMANDES PERSONNALISEES
 % -------------------------------------------------
 
@@ -290,9 +285,17 @@ Apprentissage, règles et rejet des flux inconnus pour la QoS
 \input{analyse}
 \input{conception}
 
-\section*{Références bibliographiques}
+% -------------------------------------------------
+% REFERENCES BIBLIOGRAPHIQUES
+% -------------------------------------------------
+
+\clearpage
+\chapter*{Références bibliographiques}
 \addcontentsline{toc}{chapter}{Références bibliographiques}
-\bibliographystyle{ieeetr}
+
+\nocite{*}
+
+\bibliographystyle{IEEEtranN}
 \bibliography{references}
 
 \end{document}

@@ -1,49 +1,62 @@
-This is BibTeX, Version 0.99e (TeX Live 2026/Debian)
+This is BibTeX, Version 0.99e
 Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: main.aux
-The style file: ieeetr.bst
+Reallocating 'name_of_file' (item size: 1) to 10 items.
+The style file: IEEEtranN.bst
+Reallocating 'name_of_file' (item size: 1) to 11 items.
+Reallocating 'singl_function' (item size: 4) to 100 items.
+Reallocating 'singl_function' (item size: 4) to 100 items.
+Reallocating 'singl_function' (item size: 4) to 100 items.
+Reallocating 'wiz_functions' (item size: 4) to 6000 items.
+Reallocating 'singl_function' (item size: 4) to 100 items.
 Database file #1: references.bib
-Warning--empty journal in drapergil2016
-Warning--can't use both volume and number fields in scheirer2013
-You've used 6 entries,
-            1876 wiz_defined-function locations,
-            513 strings with 4367 characters,
-and the built_in function-call counts, 1474 in all, are:
-= -- 137
-> -- 56
-< -- 0
-+ -- 21
-- -- 15
-* -- 104
-:= -- 216
-add.period$ -- 6
-call.type$ -- 6
-change.case$ -- 6
-chr.to.int$ -- 0
-cite$ -- 8
-duplicate$ -- 81
-empty$ -- 151
-format.name$ -- 15
-if$ -- 352
-int.to.chr$ -- 0
-int.to.str$ -- 6
-missing$ -- 6
-newline$ -- 21
-num.names$ -- 6
-pop$ -- 26
+-- IEEEtranN.bst version 1.13 (2008/09/30) by Michael Shell.
+-- http://www.michaelshell.org/tex/ieeetran/bibtex/
+-- See the "IEEEtran_bst_HOWTO.pdf" manual for usage information.
+** Natbib version - not for normal IEEE work.
+Reallocating 'glb_str_end' (item size: 4) to 20 items.
+Reallocating 'glb_str_ptr' (item size: 4) to 20 items.
+Reallocating 'global_strs' (item size: 1) to 4000000 items.
+
+Done.
+You've used 7 entries,
+            4783 wiz_defined-function locations,
+            979 strings with 9250 characters,
+and the built_in function-call counts, 6761 in all, are:
+= -- 606
+> -- 172
+< -- 59
++ -- 93
+- -- 40
+* -- 371
+:= -- 1017
+add.period$ -- 14
+call.type$ -- 7
+change.case$ -- 14
+chr.to.int$ -- 130
+cite$ -- 7
+duplicate$ -- 438
+empty$ -- 487
+format.name$ -- 55
+if$ -- 1508
+int.to.chr$ -- 1
+int.to.str$ -- 8
+missing$ -- 64
+newline$ -- 45
+num.names$ -- 21
+pop$ -- 151
 preamble$ -- 1
-purify$ -- 0
-quote$ -- 0
-skip$ -- 45
+purify$ -- 7
+quote$ -- 2
+skip$ -- 510
 stack$ -- 0
-substring$ -- 83
-swap$ -- 26
-text.length$ -- 0
+substring$ -- 323
+swap$ -- 339
+text.length$ -- 13
 text.prefix$ -- 0
-top$ -- 0
-type$ -- 0
-warning$ -- 2
-while$ -- 15
-width$ -- 7
-write$ -- 56
-(There were 2 warnings)
+top$ -- 6
+type$ -- 112
+warning$ -- 0
+while$ -- 34
+width$ -- 0
+write$ -- 106
